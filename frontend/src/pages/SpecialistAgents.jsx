@@ -3,33 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets } from '../services/api'
+import { getAgents, removeAgent } from '../services/agents'
 import { Headphones, Mail, Layers, UserPlus, Trash2, Calendar } from 'lucide-react'
 
-function getRegisteredAgentsFromStorage() {
-  try {
-    const raw = localStorage.getItem('registered_agents')
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.map(item => {
-      if (typeof item === 'string') {
-        return { name: item, email: `${item.toLowerCase().replace(/\s+/g, '.')}@ticketflow.ai`, department: '', registered_at: null }
-      }
-      if (item && typeof item === 'object') {
-        return {
-          name: item.name || (item.email ? item.email.split('@')[0] : 'Support Agent'),
-          email: item.email || '',
-          department: item.department || '',
-          status: item.status || 'Online',
-          registered_at: item.registered_at || null
-        }
-      }
-      return null
-    }).filter(Boolean)
-  } catch {
-    return []
-  }
-}
 
 const DEPT_COLORS = {
   'Database & Infrastructure': { bg: 'rgba(99,102,241,0.1)', color: '#6366f1', icon: '🗄️' },
@@ -50,19 +26,24 @@ export default function SpecialistAgents({ user }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setRegisteredAgents(getRegisteredAgentsFromStorage())
+    // Load agents from Supabase
+    getAgents()
+      .then(agents => setRegisteredAgents(agents))
+      .catch(() => setRegisteredAgents([]))
+      .finally(() => setLoading(false))
+
     getTickets()
       .then(res => setTickets(Array.isArray(res) ? res : []))
       .catch(() => setTickets([]))
-      .finally(() => setLoading(false))
   }, [])
 
-  const handleRemoveAgent = (email) => {
+  const handleRemoveAgent = async (email) => {
     try {
-      const updated = registeredAgents.filter(a => a.email !== email)
-      localStorage.setItem('registered_agents', JSON.stringify(updated))
-      setRegisteredAgents(updated)
-    } catch { /* ignore */ }
+      await removeAgent(email)
+      setRegisteredAgents(prev => prev.filter(a => a.email !== email))
+    } catch (err) {
+      console.error('Failed to remove agent:', err)
+    }
   }
 
   const getAgentTicketCount = (agentEmail, agentName) => {

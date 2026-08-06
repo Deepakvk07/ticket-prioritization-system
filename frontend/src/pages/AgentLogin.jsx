@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Headphones, Eye, EyeOff, ArrowLeft, CheckCircle2, ShieldCheck, Sparkles, UserPlus, Layers, Pencil } from 'lucide-react'
+import { registerAgent, signInAgent } from '../services/agents'
 
 const SPECIALIST_CATEGORIES = [
   { label: '🗄️ Database & Infrastructure', value: 'Database & Infrastructure' },
@@ -35,10 +36,14 @@ export default function AgentLogin() {
     localStorage.removeItem('demo_user')
   }
 
-  const handleAgentSubmit = (e) => {
+  const handleAgentSubmit = async (e) => {
     e.preventDefault()
     if (!email.trim()) {
       setError('Please enter a valid agent email address.')
+      return
+    }
+    if (!password.trim()) {
+      setError('Please enter your password.')
       return
     }
 
@@ -46,63 +51,63 @@ export default function AgentLogin() {
     setError('')
     setSuccess('')
 
-    setTimeout(() => {
+    try {
       let agentObj
 
       if (tab === 'register') {
-        // Build new agent from registration form
-        agentObj = {
-          email: email.trim(),
-          role: 'agent',
-          name: fullName.trim() || email.split('@')[0],
-          department: specialistCategory,
-          status: 'Online',
-          registered_at: new Date().toISOString()
+        if (!fullName.trim()) {
+          setError('Please enter your full name.')
+          setLoading(false)
+          return
         }
-        // Save to registered_agents list
-        try {
-          const existingRaw = localStorage.getItem('registered_agents')
-          const existing = existingRaw ? JSON.parse(existingRaw) : []
-          const filtered = Array.isArray(existing)
-            ? existing.filter(a => a && typeof a === 'object' && a.email && a.email.toLowerCase() !== email.trim().toLowerCase())
-            : []
-          filtered.push(agentObj)
-          localStorage.setItem('registered_agents', JSON.stringify(filtered))
-        } catch {
-          localStorage.setItem('registered_agents', JSON.stringify([agentObj]))
+        // Register in Supabase
+        agentObj = await registerAgent({
+          name: fullName.trim(),
+          email: email.trim(),
+          department: specialistCategory,
+          password: password.trim()
+        })
+        if (!agentObj) {
+          setError('Registration failed. Please try again.')
+          setLoading(false)
+          return
         }
       } else {
-        // Sign-in: look up existing registered agent by email to restore their saved profile
-        let savedAgent = null
-        try {
-          const existingRaw = localStorage.getItem('registered_agents')
-          const existing = existingRaw ? JSON.parse(existingRaw) : []
-          savedAgent = Array.isArray(existing)
-            ? existing.find(a => a && a.email && a.email.toLowerCase() === email.trim().toLowerCase())
-            : null
-        } catch { savedAgent = null }
-
-        agentObj = savedAgent
-          ? { ...savedAgent, status: 'Online' }
-          : {
-              email: email.trim(),
-              role: 'agent',
-              name: email.split('@')[0] || 'Support Agent',
-              department: '',
-              status: 'Online',
-              registered_at: new Date().toISOString()
-            }
+        // Sign-in: verify credentials from Supabase
+        agentObj = await signInAgent(email.trim(), password.trim())
+        if (!agentObj) {
+          // Fallback to localStorage for agents registered before this update
+          try {
+            const existingRaw = localStorage.getItem('registered_agents')
+            const existing = existingRaw ? JSON.parse(existingRaw) : []
+            const localAgent = Array.isArray(existing)
+              ? existing.find(a => a && a.email && a.email.toLowerCase() === email.trim().toLowerCase())
+              : null
+            if (localAgent) agentObj = localAgent
+          } catch { /* ignore */ }
+        }
+        if (!agentObj) {
+          setError('No agent account found with those credentials. Please register first.')
+          setLoading(false)
+          return
+        }
       }
 
+      // Persist session to localStorage for this portal session
       localStorage.setItem('user_role_mode', 'agent')
-      localStorage.setItem('demo_user', JSON.stringify(agentObj))
+      localStorage.setItem('demo_user', JSON.stringify({ ...agentObj, role: 'agent', status: 'Online' }))
 
       setSuccess(tab === 'signin' ? 'Sign in successful! Loading agent queue...' : 'Agent account registered! Entering workspace...')
       setTimeout(() => {
         navigate('/tickets')
         window.location.reload()
       }, 400)
-    }, 400)
+    } catch (err) {
+      console.error('Agent auth error:', err)
+      setError(err?.message || 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
