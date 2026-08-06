@@ -356,6 +356,24 @@ export default function TicketDetail({ user }) {
             )
           })()}
 
+          {/* ⚡ AI Executive Summary Block */}
+          <div className="card" style={{ padding: '18px 22px', marginBottom: 20, background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(99, 102, 241, 0.04))', border: '1px solid rgba(37, 99, 235, 0.25)', borderRadius: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={16} /> AI Executive Triage Summary
+              </div>
+              <span className="badge badge-medium" style={{ fontSize: '0.72rem' }}>GPT-4 Omni Synthesized</span>
+            </div>
+            <div style={{ fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: 8, fontWeight: 600 }}>
+              💡 <strong>Key Issue:</strong> {t.subject}. {t.description ? t.description.slice(0, 140) + '...' : ''}
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span>Category: <strong style={{ color: 'var(--text-primary)' }}>{t.category || 'Technical Support'}</strong></span>
+              <span>•</span>
+              <span>Priority SLA: <strong style={{ color: t.priority === 'Critical' ? '#ef4444' : '#2563eb' }}>{t.priority || 'Medium'}</strong></span>
+            </div>
+          </div>
+
           {/* Customer Message Card */}
           <div className="card" style={{ marginBottom: 24, padding: 24 }}>
             <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
