@@ -7,15 +7,11 @@ frontend/dist/
 .env.test.local
 .env.production.local
 
-# Python Virtual Environments & Libraries
+# Python Virtual Environments (Scope explicitly to backend)
 backend/venv/
 backend/Lib/
 backend/Scripts/
 backend/Include/
-venv/
-Lib/
-Scripts/
-Include/
 backend/__pycache__/
 backend/*/__pycache__/
 backend/*/*/__pycache__/
