@@ -56,8 +56,11 @@ export default function Analytics({ user }) {
       .catch(() => setLoading(false))
   }, [])
 
-  const priorityPie = Object.entries(data.tickets_by_priority).map(([name, value]) => ({ name, value }))
-  const totalActive = data.active_tickets || Object.values(data.tickets_by_priority).reduce((a, b) => a + b, 0)
+  const analyticsData = data && typeof data === 'object' ? { ...MOCK_ANALYTICS, ...data } : MOCK_ANALYTICS
+  const priorityObj = analyticsData.tickets_by_priority || MOCK_ANALYTICS.tickets_by_priority
+  const priorityPie = Object.entries(priorityObj).map(([name, value]) => ({ name, value }))
+  const totalActive = analyticsData.active_tickets || Object.values(priorityObj).reduce((a, b) => a + b, 0)
+  const ticketsByDay = Array.isArray(analyticsData.tickets_by_day) ? analyticsData.tickets_by_day : MOCK_ANALYTICS.tickets_by_day
 
   return (
     <div className="app-layout">
