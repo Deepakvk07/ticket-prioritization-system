@@ -4,54 +4,23 @@ import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets, updateTicket } from '../services/api'
 import { getAgents } from '../services/agents'
-import { Filter, ChevronRight, ShieldCheck, Layers, UserCheck, Download } from 'lucide-react'
+import { supabase } from '../lib/supabase'
+import { Filter, ChevronRight, ShieldCheck, Layers, UserCheck, Download, Zap, Sparkles, CheckCircle2 } from 'lucide-react'
 
 const priorityClass = { Critical: 'critical', High: 'high', Medium: 'medium', Low: 'low' }
 const statusClass = { Open: 'open', 'In Progress': 'progress', 'On Hold': 'hold', Resolved: 'resolved' }
 
 const PRIORITY_ORDER = { Critical: 1, High: 2, Medium: 3, Low: 4 }
 
-const CATEGORY_TO_DEPARTMENT = {
-  'Database & Infrastructure': ['Database & Infrastructure'],
-  'Infrastructure': ['Database & Infrastructure'],
-  'Server': ['Database & Infrastructure'],
-  'DevOps': ['Database & Infrastructure'],
-
-  'Web & UI/UX': ['Web & UI/UX'],
-  'Frontend': ['Web & UI/UX'],
-  'UI/UX': ['Web & UI/UX'],
-  'Design': ['Web & UI/UX'],
-
-  'Billing & Integrations': ['Billing & Integrations'],
-  'Billing': ['Billing & Integrations'],
-  'Payment': ['Billing & Integrations'],
-  'Integrations': ['Billing & Integrations'],
-
-  'API & Security': ['API & Security'],
-  'API': ['API & Security'],
-  'Security': ['API & Security'],
-  'Authentication': ['API & Security'],
-
-  'Technical Support': ['Technical Support'],
-  'General': ['Technical Support'],
-  'Other': ['Technical Support'],
-}
-
 function getTicketDepartment(ticket) {
-  const cat = (ticket.category || ticket.product_module || '').trim()
-  if (CATEGORY_TO_DEPARTMENT[cat]) {
-    return CATEGORY_TO_DEPARTMENT[cat]
-  }
+  const text = `${ticket.category || ''} ${ticket.product_module || ''} ${ticket.subject || ''}`.toLowerCase()
+  if (/database|sql|infra|server|devops|deployment|kubernetes|docker|cloud|aws|hosting/i.test(text)) return 'Database & Infrastructure'
+  if (/ui|ux|frontend|css|html|web|design|layout|display|responsive|mobile|dark mode|theme/i.test(text)) return 'Web & UI/UX'
+  if (/billing|payment|invoice|subscription|refund|charge|pricing|plan|cancellation/i.test(text)) return 'Billing & Integrations'
+  if (/api|security|auth|token|oauth|ssl|certificate|encryption|endpoint|webhook|cors/i.test(text)) return 'API & Security'
 
-  const text = `${cat} ${ticket.subject || ''}`.toLowerCase()
-  if (/database|sql|infra|server|devops|deployment|kubernetes|docker|cloud|aws|hosting/i.test(text)) return ['Database & Infrastructure']
-  if (/ui|ux|frontend|css|html|web|design|layout|display|responsive|mobile|dark mode|theme/i.test(text)) return ['Web & UI/UX']
-  if (/billing|payment|invoice|subscription|refund|charge|pricing|plan|cancellation/i.test(text)) return ['Billing & Integrations']
-  if (/api|security|auth|token|oauth|ssl|certificate|encryption|endpoint|webhook|cors/i.test(text)) return ['API & Security']
-
-  return ['Technical Support']
+  return 'Technical Support'
 }
-
 
 export default function TicketQueue({ user }) {
   const navigate = useNavigate()
@@ -60,6 +29,8 @@ export default function TicketQueue({ user }) {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
+  const [autoAssigning, setAutoAssigning] = useState(false)
+  const [assignSuccessMsg, setAssignSuccessMsg] = useState('')
 
   const demoUser = (() => {
     try { return JSON.parse(localStorage.getItem('demo_user') || '{}') } catch { return {} }
@@ -80,6 +51,18 @@ export default function TicketQueue({ user }) {
       .then(res => setTickets(Array.isArray(res) ? res : []))
       .catch(() => setTickets([]))
       .finally(() => setLoading(false))
+
+    // Supabase Realtime channel listener for live sync across all portals
+    const channel = supabase
+      .channel('public:tickets')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
+        getTickets().then(res => setTickets(Array.isArray(res) ? res : []))
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const handleAssignAgent = async (ticketId, agentObj) => {
@@ -104,6 +87,53 @@ export default function TicketQueue({ user }) {
         return t
       }))
     } catch {}
+  }
+
+  // 1-Click Auto-Assign Engine
+  const handleAutoAssignAll = async () => {
+    if (registeredAgents.length === 0) {
+      alert('No agents registered in Supabase DB yet. Please register specialist agents first in Agent Management.')
+      return
+    }
+
+    const unassignedList = tickets.filter(t => !t.assigned_agent || t.assigned_agent === 'Unassigned')
+    if (unassignedList.length === 0) {
+      alert('All active tickets in the queue are already assigned!')
+      return
+    }
+
+    setAutoAssigning(true)
+    let count = 0
+
+    for (let i = 0; i < unassignedList.length; i++) {
+      const t = unassignedList[i]
+      const cat = (t.category || t.product_module || '').toLowerCase()
+      const deptMatch = registeredAgents.filter(a => {
+        const d = (a.department || '').toLowerCase()
+        if (cat.includes('database') || cat.includes('infra')) return d.includes('database')
+        if (cat.includes('web') || cat.includes('ui') || cat.includes('ux')) return d.includes('web')
+        if (cat.includes('billing') || cat.includes('payment')) return d.includes('billing')
+        if (cat.includes('api') || cat.includes('security')) return d.includes('api')
+        return d.includes('support') || d === cat
+      })
+
+      const targetAgent = (deptMatch.length > 0 ? deptMatch : registeredAgents)[i % (deptMatch.length || registeredAgents.length)]
+      if (targetAgent) {
+        await updateTicket(t.id, {
+          assigned_agent: targetAgent.name,
+          assigned_agent_email: targetAgent.email,
+          assigned_department: targetAgent.department,
+          status: 'In Progress'
+        }).catch(() => null)
+        count++
+      }
+    }
+
+    const updated = await getTickets()
+    setTickets(Array.isArray(updated) ? updated : [])
+    setAutoAssigning(false)
+    setAssignSuccessMsg(`⚡ Auto-assigned ${count} ticket(s) to specialist agents!`)
+    setTimeout(() => setAssignSuccessMsg(''), 4500)
   }
 
   // Filter tickets by agent linkage / department + filters
@@ -211,6 +241,17 @@ export default function TicketQueue({ user }) {
             )}
 
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
+              {isAdmin && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleAutoAssignAll}
+                  disabled={autoAssigning}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Zap size={14} className={autoAssigning ? 'spin' : ''} />
+                  {autoAssigning ? 'Auto-Assigning…' : '⚡ Auto-Assign All'}
+                </button>
+              )}
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={() => {
@@ -252,6 +293,18 @@ export default function TicketQueue({ user }) {
               </div>
             </div>
           </div>
+
+          {/* Success Toast */}
+          {assignSuccessMsg && (
+            <div style={{
+              padding: '12px 18px', marginBottom: 18, borderRadius: 10,
+              background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)',
+              color: '#10b981', fontWeight: 700, fontSize: '0.88rem',
+              display: 'flex', alignItems: 'center', gap: 8
+            }}>
+              <CheckCircle2 size={18} /> {assignSuccessMsg}
+            </div>
+          )}
 
           {/* Table */}
           <div className="card" style={{ padding: 0 }}>
