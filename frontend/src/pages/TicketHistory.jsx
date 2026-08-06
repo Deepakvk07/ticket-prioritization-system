@@ -78,8 +78,8 @@ export default function TicketHistory({ user }) {
     return true
   })
 
-  // Stats
-  const allResolved = tickets.filter(t => ['Resolved', 'Closed'].includes(t.status))
+  // Stats computed directly from historyTickets so stat cards strictly match the table rows
+  const allResolved = historyTickets
   const criticalResolved = allResolved.filter(t => t.priority === 'Critical').length
   const highResolved = allResolved.filter(t => t.priority === 'High').length
   const avgScore = allResolved.length > 0
