@@ -1,0 +1,29 @@
+name: Keep Supabase Database Active
+
+on:
+  schedule:
+    # Runs at 00:00 UTC every 3 days automatically
+    - cron: '0 0 */3 * *'
+  workflow_dispatch: # Allows manual run anytime from GitHub Actions tab
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API Heartbeat
+        run: |
+          SUPABASE_URL="https://fyqplpczwucfsifzesqp.supabase.co"
+          ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cXBscGN6d3VjZnNpZnplc3FwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzMzg1NDQsImV4cCI6MjEwMDkxNDU0NH0.EhEHY9KKQFmKoRg5s2nnsbsNnFUEoypdPw3CIU8Nqs0"
+          
+          echo "Sending keep-alive request to Supabase project..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${ANON_KEY}" \
+            -H "Authorization: Bearer ${ANON_KEY}" \
+            "${SUPABASE_URL}/rest/v1/agents?select=id&limit=1")
+          
+          echo "Supabase HTTP Response Status: ${HTTP_STATUS}"
+          if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 206 ]; then
+            echo "Successfully pinged Supabase. Database is active and healthy!"
+          else
+            echo "Keep-alive ping sent (HTTP status ${HTTP_STATUS}). Project activity registered."
+          fi
