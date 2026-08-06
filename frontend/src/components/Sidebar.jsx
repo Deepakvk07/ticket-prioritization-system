@@ -10,14 +10,12 @@ const ADMIN_NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/tickets', icon: Ticket, label: 'Ticket Queue (Admin)' },
   { to: '/agents', icon: Headphones, label: 'Agent Management' },
-  { to: '/history', icon: Clock, label: 'Ticket History' },
   { to: '/analytics', icon: BarChart2, label: 'Analytics' },
   { to: '/model', icon: Cpu, label: 'Model Management' },
 ]
 
 const AGENT_NAV = [
   { to: '/tickets', icon: Ticket, label: 'Assigned Tickets' },
-  { to: '/history', icon: Clock, label: 'Ticket History' },
 ]
 
 const CUSTOMER_NAV = [
