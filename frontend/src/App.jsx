@@ -87,6 +87,8 @@ export default function App() {
     }
   }, [])
 
+  const defaultRoute = getDefaultPortalRoute()
+
   return (
     <BrowserRouter>
       <Routes>
@@ -143,18 +145,9 @@ export default function App() {
         <Route path="/user" element={<Login />} />
         <Route path="/customer" element={<Login />} />
 
-        {/* Default Root Route — Dynamic per Vercel deployment mode */}
-        <Route
-          path="/"
-          element={
-            import.meta.env.VITE_PORTAL_TYPE === 'admin'
-              ? <Navigate to="/admin-login" replace />
-              : import.meta.env.VITE_PORTAL_TYPE === 'agent'
-                ? <Navigate to="/agent-login" replace />
-                : <Navigate to="/login" replace />
-          }
-        />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        {/* Default Root Route — Automatic per domain name or environment */}
+        <Route path="/" element={<Navigate to={defaultRoute} replace />} />
+        <Route path="*" element={<Navigate to={defaultRoute} replace />} />
       </Routes>
     </BrowserRouter>
   )
