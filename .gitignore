@@ -1,0 +1,40 @@
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python Virtual Environments & Libraries
+backend/venv/
+backend/Lib/
+backend/Scripts/
+backend/Include/
+venv/
+Lib/
+Scripts/
+Include/
+backend/__pycache__/
+backend/*/__pycache__/
+backend/*/*/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+*.exe
+*.dll
+*.whl
+*.so
+
+# IDE & System
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+customer_support_tickets.csv
+*.pkl
+*.log

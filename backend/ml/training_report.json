@@ -1,0 +1,19 @@
+{
+  "trained_at": "2026-08-06T10:26:21.450361",
+  "dataset_source": "hybrid (customer_support_tickets.csv patterns + priority-aware synthetic)",
+  "csv_file": "E:\\Ticket Prioritization System\\customer_support_tickets.csv",
+  "csv_rows_analyzed": 8469,
+  "dataset_size": 15000,
+  "train_size": 12000,
+  "test_size": 3000,
+  "accuracy": 100.0,
+  "f1_macro": 1.0,
+  "classes": [
+    "Critical",
+    "High",
+    "Low",
+    "Medium"
+  ],
+  "vocabulary_size": 11151,
+  "training_duration_seconds": 1.8
+}
