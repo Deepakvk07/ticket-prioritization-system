@@ -556,56 +556,7 @@ export default function HomePage({ user }) {
             )}
           </div>
 
-          {/* ── Enterprise Support Platform Overview ─────────────────── */}
-          <div className="card" style={{ padding: '32px 36px', borderRadius: 20, background: 'var(--bg-surface)', border: '1px solid var(--border-active)', marginBottom: 32 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, alignItems: 'center' }}>
-              <div>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#2563eb', fontSize: '0.8rem', fontWeight: 700, marginBottom: 14 }}>
-                  <ShieldCheck size={14} /> ENTERPRISE SUPPORT PLATFORM
-                </div>
-                <h3 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.3, marginBottom: 12 }}>
-                  About TicketFlow AI Support Portal
-                </h3>
-                <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', lineHeight: 1.65, marginBottom: 20 }}>
-                  TicketFlow AI is a central resolution hub engineered for seamless technical support management, connecting users with dedicated specialists to resolve inquiries promptly and efficiently.
-                </p>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(59, 130, 246, 0.12)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.82rem', flexShrink: 0 }}>✓</div>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Unified Customer Support Workspace</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Submit technical tickets, attach log files, and manage all your inquiries from a single organized dashboard.</div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.82rem', flexShrink: 0 }}>✓</div>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Dedicated Specialist Assistance</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Your requests are directed to qualified domain specialists for comprehensive technical analysis and resolution.</div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.82rem', flexShrink: 0 }}>✓</div>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Real-Time Status & Audit History</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Track progress, view activity timelines, and receive updates directly through your personal ticket portal.</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)' }}>
-                <img src="/ticket_workflow_3d.jpg" alt="TicketFlow Platform Workspace" style={{ width: '100%', height: 310, objectFit: 'cover', display: 'block' }} />
-                <div style={{ position: 'absolute', bottom: 12, left: 12, right: 12, padding: '10px 16px', borderRadius: 10, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(12px)', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 600 }}>
-                  <span>🛡️ TicketFlow Enterprise Support Workspace</span>
-                  <span style={{ color: '#34d399' }}>● 24/7 Availability</span>
-                </div>
-              </div>
-            </div>
-          </div>
 
 
 
