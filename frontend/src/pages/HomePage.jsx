@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { createTicket, uploadToImgBB } from '../services/api'
+import { useTranslation } from '../lib/i18n'
 import {
   Sparkles, PlusCircle, CheckCircle2, AlertCircle,
   Cpu, Send, Pencil, Bold, Italic, List, Link2, AtSign,
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react'
 
 export default function HomePage({ user }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const email = user?.email || ''
   const userName = user?.name || user?.user_metadata?.full_name || (email ? email.split('@')[0] : 'Valued Customer')
@@ -331,13 +333,13 @@ export default function HomePage({ user }) {
                   fontSize: '2.4rem', fontWeight: 800, color: '#ffffff',
                   lineHeight: 1.2, letterSpacing: '-0.025em', marginBottom: 10
                 }}>
-                  TicketFlow AI Resolution Hub
+                  {t('resolution_hub')}
                 </h1>
 
                 <p style={{
                   fontSize: '0.98rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 0
                 }}>
-                  Welcome back, <strong style={{ color: '#f8fafc' }}>{userName}</strong>. Track your existing tickets or submit a new inquiry below.
+                  {t('welcome_back')}, <strong style={{ color: '#f8fafc' }}>{userName}</strong>. {t('track_or_submit')}
                 </p>
               </div>
             </div>
@@ -353,10 +355,10 @@ export default function HomePage({ user }) {
               </div>
               <div>
                 <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-                  {submittedTicket ? 'Ticket Submitted Successfully' : 'Submit a Support Ticket'}
+                  {submittedTicket ? t('submitted_success') : t('submit_support_ticket')}
                 </h3>
                 <div style={{ fontSize: '0.86rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                  {submittedTicket ? 'Your support ticket has been registered with our AI engine.' : 'Need help or encountering a system issue? Fill in your query details below.'}
+                  {submittedTicket ? t('analyzed_by_ai') : t('need_help_sub')}
                 </div>
               </div>
             </div>
@@ -366,10 +368,10 @@ export default function HomePage({ user }) {
               <div style={{ padding: '32px 24px', borderRadius: 14, background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', textAlign: 'center' }}>
                 <CheckCircle2 size={56} color="#10b981" style={{ margin: '0 auto 16px' }} />
                 <h3 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8 }}>
-                  Thank you! Your ticket has been submitted.
+                  {t('submitted_success')}
                 </h3>
                 <p style={{ fontSize: '0.94rem', color: 'var(--text-secondary)', marginBottom: 20 }}>
-                  Your ticket has been analyzed by our AI Prioritization Engine. Here is your unique Ticket ID:
+                  {t('analyzed_by_ai')}
                 </p>
 
                 {/* Displayed Ticket Code Box */}
@@ -388,7 +390,7 @@ export default function HomePage({ user }) {
                     onClick={() => copyToClipboard(submittedTicket.code)}
                     style={{ color: '#2563eb' }}
                   >
-                    <Copy size={16} /> {copied ? 'Copied!' : 'Copy ID'}
+                    <Copy size={16} /> {copied ? t('copied') : t('copy_id')}
                   </button>
                 </div>
 
@@ -398,7 +400,7 @@ export default function HomePage({ user }) {
                     onClick={() => navigate(`/track?id=${submittedTicket.code}`)}
                     style={{ padding: '12px 26px', fontWeight: 700, background: 'linear-gradient(135deg, #10b981, #059669)' }}
                   >
-                    <ExternalLink size={16} /> Track Ticket Status
+                    <ExternalLink size={16} /> {t('track_status_btn')}
                   </button>
 
                   <button
@@ -406,7 +408,7 @@ export default function HomePage({ user }) {
                     onClick={() => navigate('/tickets')}
                     style={{ padding: '12px 26px' }}
                   >
-                    View My Tickets Queue
+                    {t('view_my_queue')}
                   </button>
 
                   <button
@@ -414,7 +416,7 @@ export default function HomePage({ user }) {
                     onClick={() => setSubmittedTicket(null)}
                     style={{ padding: '12px 20px' }}
                   >
-                    Submit Another Query
+                    {t('submit_another')}
                   </button>
                 </div>
               </div>
@@ -430,12 +432,12 @@ export default function HomePage({ user }) {
                 <form onSubmit={handleSubmit}>
                   {/* Subject Field */}
                   <div style={{ marginBottom: 20 }}>
-                    <label className="modal-field-label">Ticket Subject *</label>
+                    <label className="modal-field-label">{t('ticket_subject_req')}</label>
                     <input
                       id="ticket-subject-input"
                       type="text"
                       className="modal-input"
-                      placeholder="Brief summary of your technical issue or question..."
+                      placeholder={t('subject_placeholder')}
                       value={subject}
                       onChange={e => setSubject(e.target.value)}
                       required
@@ -444,7 +446,7 @@ export default function HomePage({ user }) {
 
                   {/* Detailed Description */}
                   <div style={{ marginBottom: 22 }}>
-                    <label className="modal-field-label">Detailed Description *</label>
+                    <label className="modal-field-label">{t('detailed_desc_req')}</label>
                     
                     {/* Formatting Toolbar */}
                     <div style={{
@@ -476,7 +478,7 @@ export default function HomePage({ user }) {
                       id="ticket-desc-input"
                       className="modal-input"
                       style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, minHeight: 140, padding: 14, resize: 'vertical' }}
-                      placeholder="Describe your issue, error codes, steps to reproduce, or requirements in detail..."
+                      placeholder={t('desc_placeholder')}
                       value={description}
                       onChange={e => setDescription(e.target.value)}
                       required
@@ -485,7 +487,7 @@ export default function HomePage({ user }) {
 
                   {/* File Upload Zone */}
                   <div style={{ marginBottom: 24 }}>
-                    <label className="modal-field-label">File Attachments</label>
+                    <label className="modal-field-label">{t('file_attachments')}</label>
                     <div
                       onDrop={handleDrop}
                       onDragOver={e => { e.preventDefault(); setDragOver(true) }}
@@ -501,8 +503,8 @@ export default function HomePage({ user }) {
                         transition: 'all 0.2s ease',
                       }}>
                       <Upload size={24} color="#64748b" style={{ margin: '0 auto 8px' }} />
-                      <div style={{ fontSize: '0.88rem', fontWeight: 500, color: '#cbd5e1', marginBottom: 2 }}>Click to upload or drag and drop</div>
-                      <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Logs, screenshots, or stack trace files (Max 25MB)</div>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 500, color: '#cbd5e1', marginBottom: 2 }}>{t('drag_drop_text')}</div>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{t('upload_hint')}</div>
                       <input id="file-input-homepage" type="file" multiple hidden onChange={e => setFiles(f => [...f, ...Array.from(e.target.files)])} />
                     </div>
                     {files.length > 0 && (
@@ -548,7 +550,7 @@ export default function HomePage({ user }) {
                       disabled={submitting}
                       style={{ padding: '14px 36px', fontSize: '1rem', fontWeight: 700, background: 'linear-gradient(135deg, #10b981, #059669)', display: 'flex', alignItems: 'center', gap: 8 }}
                     >
-                      <Send size={18} /> {submitting ? 'Analyzing & Submitting…' : 'Submit Ticket'}
+                      <Send size={18} /> {submitting ? t('submitting') : t('submit_btn')}
                     </button>
                   </div>
                 </form>
