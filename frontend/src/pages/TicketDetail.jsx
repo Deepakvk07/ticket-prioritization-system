@@ -6,28 +6,6 @@ import { getTicket, addActivity, updateTicket, uploadToImgBB } from '../services
 import { getTicketRating, saveTicketRating } from '../services/admins'
 import { ChevronRight, Paperclip, Send, ArrowLeft, X, Eye, FileText, Image as ImageIcon, Download, Star, RotateCcw, FileDown, CheckCircle2, Clock, AlertCircle, Loader } from 'lucide-react'
 
-// Fallback graphic figure if no image URL is provided
-const SAMPLE_FIGURE = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500"><rect width="100%" height="100%" fill="%23070d18"/><rect x="20" y="20" width="860" height="460" rx="14" fill="%230f172a" stroke="%233b82f6" stroke-width="2"/><rect x="20" y="20" width="860" height="44" rx="14" fill="%231e293b"/><circle cx="50" cy="42" r="6" fill="%23ef4444"/><circle cx="70" cy="42" r="6" fill="%23f59e0b"/><circle cx="90" cy="42" r="6" fill="%2310b981"/><text x="450" y="47" font-family="monospace" font-size="13" fill="%2394a3b8" text-anchor="middle">http://localhost:5173/tickets/TK-8842-UX — Developer Audit Console</text><rect x="40" y="85" width="820" height="375" rx="8" fill="%23020617"/><text x="60" y="125" font-family="monospace" font-size="14" fill="%23ef4444" font-weight="bold">[ERROR 504] Handshake Timeout at /v1/export Endpoint</text><text x="60" y="160" font-family="monospace" font-size="13" fill="%2338bdf8">▶ POST /api/tickets/submit — 200 OK (340ms)</text><text x="60" y="195" font-family="monospace" font-size="13" fill="%23f59e0b">⚠️ [WARN] CORS preflight request headers accepted with fallback</text><text x="60" y="230" font-family="monospace" font-size="13" fill="%2334d399">✓ [INFO] Neural Priority Classifier predicted priority: High (94.2%)</text><text x="60" y="265" font-family="monospace" font-size="13" fill="%2394a3b8">  at ServiceMesh.syncEndpoints (http://localhost:5173/assets/index.js:142:18)</text><text x="60" y="300" font-family="monospace" font-size="13" fill="%2394a3b8">  at async Dispatcher.handleRequest (http://localhost:5173/assets/index.js:809:4)</text></svg>`
-
-const MOCK_TICKET = {
-  id: 'TK-8842-UX',
-  subject: 'Unable to sync API endpoints with production environment',
-  category: 'Integration Issue',
-  status: 'In Progress',
-  priority: 'High',
-  customer_name: 'Customer',
-  customer_email: 'customer@company.com',
-  description: `Hi support team,\n\nWe are encountering a critical error whenever we attempt to sync our internal service mesh with the production endpoints.\n\nI've verified our API keys and headers. The logs suggest a handshake timeout before the auth failure. Please investigate urgently as this is blocking our weekly deployment cycle.`,
-  created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
-  attachments: [
-    { name: 'error_logs_241023.txt', size: '42 KB', type: 'text', url: null, content: `[2026-07-30 11:09:12] ERROR 504 Handshake Timeout at /v1/export\n[2026-07-30 11:09:15] WARN Connection reset by peer 192.168.1.1` },
-    { name: 'console_screenshot.png', size: '1.2 MB', type: 'image', url: SAMPLE_FIGURE }
-  ],
-  activities: [
-    { id: '1', type: 'message', author: 'Support Specialist', author_role: 'AGENT', content: "I've reviewed the logs and screenshot figure you attached. It seems the CIDR range for your new service mesh isn't whitelisted in our production VPC. I'm initiating the update now. This should resolve the issue within 15 minutes.", created_at: new Date(Date.now() - 3600000).toISOString() },
-  ],
-}
-
 export default function TicketDetail({ user }) {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -44,15 +22,16 @@ export default function TicketDetail({ user }) {
   const replyFileRef = useRef(null)
 
   useEffect(() => {
+    setLoading(true)
     getTicket(id)
       .then(t => { setTicket(t); setLoading(false) })
-      .catch(() => { setTicket({ ...MOCK_TICKET, id }); setLoading(false) })
+      .catch(() => { setTicket(null); setLoading(false) })
   }, [id])
 
   useEffect(() => {
     // Load saved rating from Supabase
     const userEmail = (() => { try { return JSON.parse(localStorage.getItem('demo_user') || '{}')?.email || '' } catch { return '' } })()
-    if (userEmail) {
+    if (userEmail && id) {
       getTicketRating(id, userEmail).then(r => {
         if (r) { setRating(r); setRatingSubmitted(true) }
       }).catch(() => null)
@@ -73,7 +52,7 @@ export default function TicketDetail({ user }) {
     : (user?.user_metadata?.full_name || demoUser?.name || user?.email || 'Customer')
 
   const handleSend = async () => {
-    if (!reply.trim()) return
+    if (!reply.trim() || !ticket) return
     setSending(true)
     try {
       await addActivity(id, {
@@ -89,7 +68,7 @@ export default function TicketDetail({ user }) {
     } catch {
       setTicket(t => ({
         ...t,
-        activities: [...(t.activities || []), {
+        activities: [...(t?.activities || []), {
           id: Date.now(), type: 'message',
           author: currentAuthorName, author_role: currentRole, content: reply, created_at: new Date().toISOString(),
         }]
@@ -112,7 +91,6 @@ export default function TicketDetail({ user }) {
   const handleRating = async (stars) => {
     setRating(stars)
     setRatingSubmitted(true)
-    // Save to Supabase
     const userEmail = (() => { try { return JSON.parse(localStorage.getItem('demo_user') || '{}')?.email || '' } catch { return '' } })()
     try { await saveTicketRating(id, stars, userEmail) } catch { /* ignore */ }
   }
@@ -145,7 +123,8 @@ export default function TicketDetail({ user }) {
   }
 
   const handleExportPDF = () => {
-    const t = ticket || MOCK_TICKET
+    if (!ticket) return
+    const t = ticket
     const content = `
       <html><head><title>Ticket ${t.subject}</title>
       <style>body{font-family:sans-serif;padding:40px;color:#111}h1{font-size:1.5rem}table{width:100%;border-collapse:collapse;margin:16px 0}td,th{border:1px solid #ddd;padding:8px 12px;text-align:left}th{background:#f3f4f6}pre{background:#f9fafb;padding:12px;border-radius:4px;white-space:pre-wrap}.msg{background:#f3f4f6;padding:12px;margin:8px 0;border-radius:6px;border-left:4px solid #3b82f6}</style>
@@ -173,11 +152,43 @@ export default function TicketDetail({ user }) {
     URL.revokeObjectURL(url)
   }
 
-  // Use real ticket data if loaded from DB, otherwise fall back to mock only for the demo ticket
-  const isMockTicket = !ticket
-  const t = ticket || MOCK_TICKET
+  if (loading) {
+    return (
+      <div className="app-layout">
+        <Sidebar user={user} />
+        <div className="main-content" style={{ background: '#ffffff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+            <Loader className="spin" size={28} style={{ marginBottom: 12, color: 'var(--accent)' }} />
+            <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Loading ticket details...</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
-  // Parse attachments - ONLY use real data from DB, never inject mock files into real tickets
+  if (!ticket) {
+    return (
+      <div className="app-layout">
+        <Sidebar user={user} />
+        <div className="main-content" style={{ background: '#ffffff', minHeight: '100vh' }}>
+          <Topbar user={user} placeholder="Search tickets..." />
+          <div className="page-body" style={{ textAlign: 'center', padding: '100px 20px' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>📄</div>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 8, color: 'var(--text-primary)' }}>Ticket Not Found</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: 24, fontSize: '0.88rem' }}>
+              No ticket details could be found for ID <strong>#{id}</strong>.
+            </p>
+            <button className="btn btn-primary btn-sm" onClick={() => navigate('/tickets')}>
+              <ArrowLeft size={14} /> Return to Tickets List
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const t = ticket
+
   let rawAttachments = []
   if (t && t.attachments) {
     if (Array.isArray(t.attachments)) {
@@ -185,10 +196,6 @@ export default function TicketDetail({ user }) {
     } else if (typeof t.attachments === 'string') {
       try { rawAttachments = JSON.parse(t.attachments) } catch { rawAttachments = [] }
     }
-  }
-  // Only use mock attachments when displaying the demo/fallback ticket (no real ticket loaded)
-  if (isMockTicket && rawAttachments.length === 0) {
-    rawAttachments = MOCK_TICKET.attachments
   }
 
   const attachments = (Array.isArray(rawAttachments) ? rawAttachments : [])
@@ -208,18 +215,15 @@ export default function TicketDetail({ user }) {
       }
       const hasRealUrl = att.url && (att.url.startsWith('http') || att.url.startsWith('data:image'))
       const isImg = att.type === 'image' || hasRealUrl || /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(att.name || '')
-      // Only use SAMPLE_FIGURE for the mock/demo ticket, never for real data
-      const url = att.url || (isMockTicket && isImg ? SAMPLE_FIGURE : null)
       return {
         name: att.name || 'Attachment',
         size: att.size || '245 KB',
         type: isImg ? 'image' : 'text',
-        url,
+        url: att.url || null,
         content: att.content || null
       }
     })
 
-  // Filter out internal notes null-safely
   const messagesOnly = (t && Array.isArray(t.activities) ? t.activities : [])
     .filter(a => a && typeof a === 'object' && a.type !== 'internal_note')
 
