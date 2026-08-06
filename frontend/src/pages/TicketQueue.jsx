@@ -67,6 +67,7 @@ export default function TicketQueue({ user }) {
   const activeRole = demoUser.role || localStorage.getItem('user_role_mode') || 'customer'
   const isAgent = activeRole === 'agent'
   const isAdmin = activeRole === 'admin'
+  const isCustomer = activeRole === 'customer'
   const agentDepartment = demoUser.department || ''
 
   useEffect(() => {
@@ -194,18 +195,20 @@ export default function TicketQueue({ user }) {
               <option value="Resolved">Resolved</option>
             </select>
 
-            <select
-              className="form-select"
-              style={{ width: 160 }}
-              value={priorityFilter}
-              onChange={e => setPriorityFilter(e.target.value)}
-            >
-              <option value="">All Priorities</option>
-              <option value="Critical">Critical</option>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
+            {!isCustomer && (
+              <select
+                className="form-select"
+                style={{ width: 160 }}
+                value={priorityFilter}
+                onChange={e => setPriorityFilter(e.target.value)}
+              >
+                <option value="">All Priorities</option>
+                <option value="Critical">Critical</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            )}
 
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
               <button
@@ -256,10 +259,10 @@ export default function TicketQueue({ user }) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Priority Level</th>
-                    <th>Score</th>
+                    {!isCustomer && <th>Priority Level</th>}
+                    {!isCustomer && <th>Score</th>}
                     <th>Ticket</th>
-                    <th>Category</th>
+                    {!isCustomer && <th>Category</th>}
                     <th>Assigned Agent</th>
                     <th>Status</th>
                     <th>Created</th>
@@ -269,7 +272,7 @@ export default function TicketQueue({ user }) {
                 <tbody>
                   {sorted.length === 0 && !loading && (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+                      <td colSpan={isCustomer ? 5 : 8} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
                         <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>📭</div>
                         <div style={{ fontWeight: 600, marginBottom: 4 }}>No tickets in your workspace queue</div>
                         <div style={{ fontSize: '0.82rem' }}>
@@ -298,25 +301,29 @@ export default function TicketQueue({ user }) {
 
                     return (
                       <tr key={t.id} onClick={() => navigate(`/tickets/${t.id}`)} style={{ cursor: 'pointer' }}>
-                        <td>
-                          <span className={`badge badge-${priorityClass[t.priority] || 'low'}`} style={{ fontWeight: 800 }}>
-                            ● {t.priority}
-                          </span>
-                        </td>
-                        <td>
-                          <span style={{
-                            fontWeight: 700,
-                            fontSize: '0.88rem',
-                            color: t.score > 85 ? 'var(--critical)' : t.score > 60 ? 'var(--high)' : 'var(--text-secondary)'
-                          }}>
-                            {t.score || 50}
-                          </span>
-                        </td>
+                        {!isCustomer && (
+                          <td>
+                            <span className={`badge badge-${priorityClass[t.priority] || 'low'}`} style={{ fontWeight: 800 }}>
+                              ● {t.priority}
+                            </span>
+                          </td>
+                        )}
+                        {!isCustomer && (
+                          <td>
+                            <span style={{
+                              fontWeight: 700,
+                              fontSize: '0.88rem',
+                              color: t.score > 85 ? 'var(--critical)' : t.score > 60 ? 'var(--high)' : 'var(--text-secondary)'
+                            }}>
+                              {t.score || 50}
+                            </span>
+                          </td>
+                        )}
                         <td>
                           <div style={{ fontWeight: 600 }}>{t.subject}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>#{t.id} · {t.customer_name}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>#{t.code || t.id} · {t.customer_name}</div>
                         </td>
-                        <td style={{ color: 'var(--text-muted)' }}>{t.category}</td>
+                        {!isCustomer && <td style={{ color: 'var(--text-muted)' }}>{t.category}</td>}
 
                         {/* Assigned Agent Selector / Badge */}
                         <td onClick={(e) => e.stopPropagation()}>

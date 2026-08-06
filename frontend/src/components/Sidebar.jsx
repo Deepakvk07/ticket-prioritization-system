@@ -23,7 +23,6 @@ const AGENT_NAV = [
 const CUSTOMER_NAV = [
   { to: '/home', icon: Home, label: 'Home' },
   { to: '/tickets', icon: Ticket, label: 'My Tickets' },
-  { to: '/history', icon: Clock, label: 'Ticket History' },
   { to: '/track', icon: Search, label: 'Track Ticket' },
   { to: '/faq', icon: BookOpen, label: 'FAQ / Help' },
 ]

@@ -60,10 +60,21 @@ export const uploadToImgBB = async (file) => {
   throw new Error('ImgBB upload failed')
 }
 
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    try { return crypto.randomUUID() } catch {}
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 // ── Tickets Services ──────────────────────────────────────────────────────
 
 export const getTickets = async (params = {}) => {
-  // 1. Try Supabase first
+  let supabaseTickets = []
   try {
     const { data, error } = await supabase
       .from('tickets')
@@ -71,32 +82,38 @@ export const getTickets = async (params = {}) => {
       .order('created_at', { ascending: false })
       .limit(params.limit || 100)
 
-    if (!error && Array.isArray(data) && data.length > 0) {
-      // Merge with local tickets
-      const local = getLocalTickets()
-      const mergedMap = new Map()
-      data.forEach(t => {
+    if (!error && Array.isArray(data)) {
+      supabaseTickets = data.map(t => {
         const code = t.ticket_code || t.code || `TK-${(t.id || '').substring(0, 5).toUpperCase()}`
-        mergedMap.set(t.id, { ...t, code, ticket_code: code })
+        return { ...t, code, ticket_code: code }
       })
-      local.forEach(t => {
-        if (!mergedMap.has(t.id)) {
-          const code = t.ticket_code || t.code || `TK-${(t.id || '').substring(0, 5).toUpperCase()}`
-          mergedMap.set(t.id, { ...t, code, ticket_code: code })
-        }
-      })
-      return Array.from(mergedMap.values())
     }
   } catch { /* fallback */ }
 
-  // 2. Try Backend API
+  // Merge Supabase tickets with local tickets
+  const local = getLocalTickets()
+  const mergedMap = new Map()
+
+  supabaseTickets.forEach(t => {
+    mergedMap.set(t.id, t)
+  })
+
+  local.forEach(t => {
+    if (!mergedMap.has(t.id) && !mergedMap.has(t.code)) {
+      mergedMap.set(t.id, t)
+    }
+  })
+
+  const merged = Array.from(mergedMap.values())
+  if (merged.length > 0) return merged
+
+  // Try Backend API fallback
   try {
     const r = await api.get('/api/tickets/', { params })
     if (Array.isArray(r.data)) return r.data
   } catch { /* fallback */ }
 
-  // 3. Fallback to LocalStorage
-  return getLocalTickets()
+  return []
 }
 
 export const getTicket = async (id) => {
@@ -136,22 +153,22 @@ export const getTicket = async (id) => {
 }
 
 export const createTicket = async (data) => {
-  // Generate fast ID & ticket code (< 50ms)
+  // Generate valid UUID for Supabase + human-friendly ticket code (< 50ms)
+  const validUuid = generateUUID()
   const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase()
   const ticketCode = `TK-${randomSuffix}`
-  const id = `tk_${Date.now()}_${randomSuffix.toLowerCase()}`
 
   // Instant AI priority prediction
   const { priority, confidence_score } = classifyTicketPriority(data.subject, data.description, data.category)
 
   const newTicket = {
-    id,
+    id: validUuid,
     ticket_code: ticketCode,
     code: ticketCode,
     subject: data.subject || 'Untitled Ticket',
     description: data.description || '',
-    category: data.category || 'General',
-    product_module: data.product_module || data.category || 'General',
+    category: data.category || 'Technical Support',
+    product_module: data.product_module || data.category || 'Technical Support',
     customer_name: data.customer_name || 'Valued Customer',
     customer_email: data.customer_email || 'customer@ticketflow.ai',
     status: 'Open',
@@ -176,15 +193,19 @@ export const createTicket = async (data) => {
     updated_at: new Date().toISOString(),
   }
 
-  // 1. Immediately cache in localStorage for zero-latency local fallback
+  // 1. Immediately cache in localStorage for zero-latency local availability
   const local = getLocalTickets()
   saveLocalTickets([newTicket, ...local])
 
-  // 2. Persist to Supabase asynchronously / in parallel
+  // 2. Persist to Supabase so Admin & Agent portals see it live
   try {
-    await supabase.from('tickets').insert([newTicket])
+    const { error } = await supabase.from('tickets').insert([newTicket])
+    if (error) {
+      console.warn('Supabase insert warning:', error.message)
+      await supabase.from('tickets').upsert([newTicket])
+    }
   } catch (err) {
-    console.warn('Supabase ticket insert warning:', err?.message)
+    console.warn('Supabase ticket insert exception:', err?.message)
   }
 
   // 3. Attempt backend API post asynchronously without blocking response
