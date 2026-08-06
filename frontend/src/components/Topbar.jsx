@@ -158,38 +158,41 @@ export default function Topbar({ user, placeholder }) {
 
       {/* Right Controls */}
       <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div className="search-bar" style={{ width: 220 }}>
-          <Search className="search-icon" size={14} />
-          <input
-            id="topbar-search"
-            type="text"
-            placeholder={placeholder}
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            style={{ fontSize: '0.82rem', padding: '6px 12px 6px 32px' }}
-          />
-        </div>
-
-        {/* Language Selector Dropdown */}
-        <select
-          className="form-select"
-          value={localStorage.getItem('tf_lang') || 'en'}
-          onChange={e => {
-            localStorage.setItem('tf_lang', e.target.value)
-            window.dispatchEvent(new Event('languageChange'))
-          }}
-          style={{
-            fontSize: '0.78rem', padding: '4px 8px', borderRadius: 8,
-            border: '1px solid var(--border)', background: 'var(--bg-input)',
-            color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer'
-          }}
-        >
-          <option value="en">🇺🇸 EN</option>
-          <option value="es">🇪🇸 ES</option>
-          <option value="fr">🇫🇷 FR</option>
-          <option value="de">🇩🇪 DE</option>
-          <option value="hi">🇮🇳 HI</option>
-        </select>
+        {/* If Customer Panel: Show Language Switch Button instead of Search Bar */}
+        {activeRole === 'customer' ? (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              const current = localStorage.getItem('tf_lang') || 'en'
+              const next = current === 'hi' ? 'en' : 'hi'
+              localStorage.setItem('tf_lang', next)
+              window.dispatchEvent(new Event('languageChange'))
+            }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '6px 14px', borderRadius: 20, fontSize: '0.82rem', fontWeight: 700,
+              background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)',
+              color: 'var(--accent)', cursor: 'pointer', transition: 'all 0.2s ease'
+            }}
+            title="Switch Language (English / हिंदी)"
+          >
+            🌐 {lang === 'hi' ? '🇮🇳 हिंदी (HI)' : '🇺🇸 English (EN)'}
+          </button>
+        ) : (
+          /* Admin / Agent Portals: Show Search Bar */
+          <div className="search-bar" style={{ width: 220 }}>
+            <Search className="search-icon" size={14} />
+            <input
+              id="topbar-search"
+              type="text"
+              placeholder={placeholder || t('search_placeholder')}
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              style={{ fontSize: '0.82rem', padding: '6px 12px 6px 32px' }}
+            />
+          </div>
+        )}
 
         {/* Dark/Light Mode Toggle */}
         <button
