@@ -135,9 +135,25 @@ export default function App() {
         <Route path="/profile" element={
           <AuthGate user={user} loading={loading}>{withUser(Profile, user)}</AuthGate>
         } />
+        {/* Direct Portal Shortcuts */}
+        <Route path="/admin" element={<AdminLogin />} />
+        <Route path="/admin-portal" element={<AdminLogin />} />
+        <Route path="/agent" element={<AgentLogin />} />
+        <Route path="/agent-portal" element={<AgentLogin />} />
+        <Route path="/user" element={<Login />} />
+        <Route path="/customer" element={<Login />} />
 
-        {/* Default Route -> Customer Login */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        {/* Default Root Route — Dynamic per Vercel deployment mode */}
+        <Route
+          path="/"
+          element={
+            import.meta.env.VITE_PORTAL_TYPE === 'admin'
+              ? <Navigate to="/admin-login" replace />
+              : import.meta.env.VITE_PORTAL_TYPE === 'agent'
+                ? <Navigate to="/agent-login" replace />
+                : <Navigate to="/login" replace />
+          }
+        />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
