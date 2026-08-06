@@ -4,7 +4,7 @@ import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTicket, addActivity, updateTicket, uploadToImgBB } from '../services/api'
 import { getTicketRating, saveTicketRating } from '../services/admins'
-import { ChevronRight, Paperclip, Send, ArrowLeft, X, Eye, FileText, Image as ImageIcon, Download, Star, RotateCcw, FileDown, CheckCircle2, Clock, AlertCircle, Loader } from 'lucide-react'
+import { ChevronRight, Paperclip, Send, ArrowLeft, X, Eye, FileText, Image as ImageIcon, Download, Star, RotateCcw, FileDown, CheckCircle2, Clock, AlertCircle, Loader, Sparkles } from 'lucide-react'
 
 export default function TicketDetail({ user }) {
   const { id } = useParams()
