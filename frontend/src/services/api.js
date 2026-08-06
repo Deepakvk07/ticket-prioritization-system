@@ -175,6 +175,7 @@ export const createTicket = async (data) => {
     priority,
     ai_priority: priority,
     confidence_score,
+    score: Math.round(confidence_score),
     assigned_agent: null,
     assigned_agent_email: null,
     assigned_department: null,

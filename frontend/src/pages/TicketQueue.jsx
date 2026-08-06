@@ -352,6 +352,8 @@ export default function TicketQueue({ user }) {
 
                     const optionsToDisplay = categoryAgents.length > 0 ? categoryAgents : registeredAgents
 
+                    const ticketScore = Math.round(t.score || t.confidence_score || (t.priority === 'Critical' ? 96 : t.priority === 'High' ? 78 : t.priority === 'Medium' ? 54 : 28))
+
                     return (
                       <tr key={t.id} onClick={() => navigate(`/tickets/${t.id}`)} style={{ cursor: 'pointer' }}>
                         {!isCustomer && (
@@ -364,11 +366,11 @@ export default function TicketQueue({ user }) {
                         {!isCustomer && (
                           <td>
                             <span style={{
-                              fontWeight: 700,
-                              fontSize: '0.88rem',
-                              color: t.score > 85 ? 'var(--critical)' : t.score > 60 ? 'var(--high)' : 'var(--text-secondary)'
+                              fontWeight: 800,
+                              fontSize: '0.9rem',
+                              color: ticketScore >= 80 ? '#ef4444' : ticketScore >= 60 ? '#f59e0b' : ticketScore >= 40 ? '#3b82f6' : '#10b981'
                             }}>
-                              {t.score || 50}
+                              {ticketScore}
                             </span>
                           </td>
                         )}
