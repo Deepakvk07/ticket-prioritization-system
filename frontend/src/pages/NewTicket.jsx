@@ -18,7 +18,7 @@ export default function NewTicket({ user }) {
   const [files, setFiles] = useState([])
   const [dragOver, setDragOver] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
+  const [createdTicket, setCreatedTicket] = useState(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -26,12 +26,16 @@ export default function NewTicket({ user }) {
     setSubmitting(true)
 
     try {
-      const ticket = await createTicket(form)
-      setSubmitted(true)
-      setTimeout(() => navigate(`/tickets/${ticket.id || 'TK-8842-UX'}`), 1200)
-    } catch {
-      setSubmitted(true)
-      setTimeout(() => navigate('/tickets'), 1200)
+      const ticket = await createTicket({
+        ...form,
+        attachments: files.map(f => ({ name: f.name, size: `${(f.size / 1024).toFixed(1)} KB`, type: f.type }))
+      })
+      setCreatedTicket(ticket)
+      const targetId = ticket?.id || ticket?.ticket_code || 'TK-8842-UX'
+      setTimeout(() => navigate(`/tickets/${targetId}`), 1000)
+    } catch (err) {
+      console.error('Ticket creation error:', err)
+      setTimeout(() => navigate('/tickets'), 1000)
     }
   }
 
@@ -42,18 +46,26 @@ export default function NewTicket({ user }) {
     setFiles(f => [...f, ...dropped])
   }
 
-  if (submitted) {
+  if (createdTicket) {
+    const code = createdTicket.ticket_code || createdTicket.code || 'TK-NEW'
     return (
       <div className="app-layout">
         <Sidebar user={user} />
         <div className="main-content">
           <Topbar user={user} />
           <div className="page-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-            <div className="card" style={{ textAlign: 'center', padding: 40, maxWidth: 420 }}>
-              <CheckCircle size={48} color="var(--success)" style={{ margin: '0 auto 16px' }} />
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: 8 }}>Ticket Submitted!</h2>
+            <div className="card" style={{ textAlign: 'center', padding: 40, maxWidth: 460, borderRadius: 16 }}>
+              <CheckCircle size={52} color="#10b981" style={{ margin: '0 auto 16px' }} />
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 8, color: 'var(--text-primary)' }}>Ticket Created Successfully!</h2>
+              <div style={{ background: 'var(--bg-input)', padding: '12px 20px', borderRadius: 12, margin: '16px 0', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>TICKET ID / CODE</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#10b981', letterSpacing: '0.05em' }}>{code}</div>
+                <div style={{ fontSize: '0.82rem', marginTop: 4, color: 'var(--text-muted)' }}>
+                  Assigned Priority: <strong style={{ color: 'var(--text-primary)' }}>{createdTicket.priority || 'Medium'}</strong> ({createdTicket.confidence_score || 90}% confidence)
+                </div>
+              </div>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-                AI engine is calculating priority and routing to the appropriate team...
+                Redirecting you to ticket workspace...
               </p>
             </div>
           </div>
