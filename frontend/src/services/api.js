@@ -199,10 +199,29 @@ export const createTicket = async (data) => {
 
   // 2. Persist to Supabase so Admin & Agent portals see it live
   try {
-    const { error } = await supabase.from('tickets').insert([newTicket])
-    if (error) {
-      console.warn('Supabase insert warning:', error.message)
-      await supabase.from('tickets').upsert([newTicket])
+    const { error: fullErr } = await supabase.from('tickets').insert([newTicket])
+    if (fullErr) {
+      console.warn('Supabase full insert failed, trying core payload fallback:', fullErr.message)
+      // Core fallback payload with standard columns
+      const corePayload = {
+        id: validUuid,
+        subject: data.subject || 'Untitled Ticket',
+        description: data.description || '',
+        category: data.category || 'Technical Support',
+        product_module: data.product_module || data.category || 'Technical Support',
+        customer_name: data.customer_name || 'Valued Customer',
+        customer_email: data.customer_email || 'customer@ticketflow.ai',
+        status: 'Open',
+        priority,
+        ai_priority: priority,
+        confidence_score,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      const { error: coreErr } = await supabase.from('tickets').insert([corePayload])
+      if (coreErr) {
+        console.error('Supabase core insert error:', coreErr.message)
+      }
     }
   } catch (err) {
     console.warn('Supabase ticket insert exception:', err?.message)
