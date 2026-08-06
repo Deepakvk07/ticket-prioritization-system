@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase'
 const ADMIN_NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/tickets', icon: Ticket, label: 'Ticket Queue (Admin)' },
-  { to: '/agents', icon: Headphones, label: 'Specialist Agents' },
+  { to: '/agents', icon: Headphones, label: 'Agent Management' },
   { to: '/history', icon: Clock, label: 'Ticket History' },
   { to: '/analytics', icon: BarChart2, label: 'Analytics' },
   { to: '/model', icon: Cpu, label: 'Model Management' },
@@ -17,7 +17,6 @@ const ADMIN_NAV = [
 
 const AGENT_NAV = [
   { to: '/tickets', icon: Ticket, label: 'Assigned Tickets' },
-  { to: '/agents', icon: Headphones, label: 'Specialist Agents' },
   { to: '/history', icon: Clock, label: 'Ticket History' },
 ]
 
@@ -29,13 +28,6 @@ const CUSTOMER_NAV = [
   { to: '/faq', icon: BookOpen, label: 'FAQ / Help' },
 ]
 
-const SIDEBAR_AGENTS_BY_CATEGORY = [
-  { category: 'Database & Infra', icon: '🗄️', agent: 'Alex Johnson' },
-  { category: 'Web & UI/UX', icon: '🎨', agent: 'Sarah Jenkins' },
-  { category: 'Billing & Integration', icon: '💳', agent: 'David Chen' },
-  { category: 'API & Security', icon: '⚡', agent: 'Elena Rostova' },
-  { category: 'Technical Support', icon: '🛠️', agent: 'Marcus Brody' },
-]
 
 function getSafeDemoUser() {
   try {
@@ -126,10 +118,10 @@ export default function Sidebar({ user }) {
             {initials}
             <span className="online-dot" />
           </div>
-          <div className="user-info">
+            <div className="user-info">
             <div className="name" style={{ fontSize: '0.78rem' }}>{name}</div>
             <div className="role" style={{ color: roleColor }}>
-              {isAdmin ? 'ADMIN / TRIAGE ENGINE' : isAgent ? 'SUPPORT AGENT (L2/L3)' : 'CUSTOMER USER'}
+              {isAdmin ? 'ADMIN / TRIAGE ENGINE' : isAgent ? (demoUser?.department ? demoUser.department.toUpperCase() : 'SUPPORT AGENT') : 'CUSTOMER USER'}
             </div>
           </div>
         </div>

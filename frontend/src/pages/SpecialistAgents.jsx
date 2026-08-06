@@ -3,35 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets } from '../services/api'
-import { Headphones, Mail, Layers, ShieldCheck, ChevronRight, CheckCircle2, UserCheck, ArrowLeft, UserPlus } from 'lucide-react'
-
-const CATEGORIES_LIST = [
-  {
-    category: 'Database & Infrastructure',
-    icon: '🗄️',
-    description: 'Database optimization, server infrastructure, cloud deployment, and SQL queries.',
-  },
-  {
-    category: 'Web & UI/UX',
-    icon: '🎨',
-    description: 'Frontend layout, CSS styling, responsive web UI, and component bugs.',
-  },
-  {
-    category: 'Billing & Integrations',
-    icon: '💳',
-    description: 'Payment gateway integrations, invoice errors, subscription billing, and refunds.',
-  },
-  {
-    category: 'API & Security',
-    icon: '⚡',
-    description: 'OAuth2 authentication, API endpoint timeouts, CORS, and security audits.',
-  },
-  {
-    category: 'Technical Support',
-    icon: '🛠️',
-    description: 'General technical support, hardware setup, software troubleshooting, and FAQs.',
-  }
-]
+import { Headphones, Mail, Layers, UserPlus, Trash2, Calendar } from 'lucide-react'
 
 function getRegisteredAgentsFromStorage() {
   try {
@@ -41,13 +13,15 @@ function getRegisteredAgentsFromStorage() {
     if (!Array.isArray(parsed)) return []
     return parsed.map(item => {
       if (typeof item === 'string') {
-        return { name: item, email: `${item.toLowerCase().replace(/\s+/g, '.')}@omnisupport.ai`, department: 'Technical Support' }
+        return { name: item, email: `${item.toLowerCase().replace(/\s+/g, '.')}@ticketflow.ai`, department: '', registered_at: null }
       }
       if (item && typeof item === 'object') {
         return {
-          name: item.name || (item.email ? item.email.split('@')[0] : 'Support Specialist'),
-          email: item.email || `agent_${Math.random().toString(36).substring(2, 7)}@omnisupport.ai`,
-          department: item.department || 'Technical Support'
+          name: item.name || (item.email ? item.email.split('@')[0] : 'Support Agent'),
+          email: item.email || '',
+          department: item.department || '',
+          status: item.status || 'Online',
+          registered_at: item.registered_at || null
         }
       }
       return null
@@ -55,6 +29,18 @@ function getRegisteredAgentsFromStorage() {
   } catch {
     return []
   }
+}
+
+const DEPT_COLORS = {
+  'Database & Infrastructure': { bg: 'rgba(99,102,241,0.1)', color: '#6366f1', icon: '🗄️' },
+  'Web & UI/UX': { bg: 'rgba(236,72,153,0.1)', color: '#ec4899', icon: '🎨' },
+  'Billing & Integrations': { bg: 'rgba(245,158,11,0.1)', color: '#f59e0b', icon: '💳' },
+  'API & Security': { bg: 'rgba(239,68,68,0.1)', color: '#ef4444', icon: '⚡' },
+  'Technical Support': { bg: 'rgba(16,185,129,0.1)', color: '#10b981', icon: '🛠️' },
+}
+
+function getDeptStyle(department) {
+  return DEPT_COLORS[department] || { bg: 'rgba(100,116,139,0.1)', color: '#64748b', icon: '👤' }
 }
 
 export default function SpecialistAgents({ user }) {
@@ -65,139 +51,166 @@ export default function SpecialistAgents({ user }) {
 
   useEffect(() => {
     setRegisteredAgents(getRegisteredAgentsFromStorage())
-
     getTickets()
       .then(res => setTickets(Array.isArray(res) ? res : []))
       .catch(() => setTickets([]))
       .finally(() => setLoading(false))
   }, [])
 
+  const handleRemoveAgent = (email) => {
+    try {
+      const updated = registeredAgents.filter(a => a.email !== email)
+      localStorage.setItem('registered_agents', JSON.stringify(updated))
+      setRegisteredAgents(updated)
+    } catch { /* ignore */ }
+  }
+
+  const getAgentTicketCount = (agentEmail, agentName) => {
+    return tickets.filter(t =>
+      (t.assigned_agent_email && t.assigned_agent_email.toLowerCase() === agentEmail.toLowerCase()) ||
+      (t.assigned_agent && agentName && t.assigned_agent.toLowerCase().includes(agentName.toLowerCase()))
+    ).length
+  }
+
   return (
     <div className="app-layout">
       <Sidebar user={user} />
       <div className="main-content">
-        <Topbar user={user} placeholder="Search registered agents or categories..." />
+        <Topbar user={user} placeholder="Search registered agents..." />
         <div className="page-body animate-fade">
 
-          <div className="page-header" style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {/* Header */}
+          <div className="page-header" style={{ marginBottom: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h2 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Headphones size={22} color="#2563eb" /> Registered Specialist Agents & Categories
+                <Headphones size={22} color="var(--accent)" /> Agent Management
               </h2>
-              <p>Support engineers registered by you for automated ticket triage.</p>
+              <p>All registered support agents and their assigned departments.</p>
             </div>
             <button
               className="btn btn-primary btn-sm"
               onClick={() => navigate('/agent-login')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             >
-              <UserPlus size={15} /> Register New Specialist Agent
+              <UserPlus size={15} /> Register New Agent
             </button>
           </div>
 
-          {/* Categories & Registered Agents List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {CATEGORIES_LIST.map(catItem => {
-              // Agents registered specifically in this category
-              const catAgents = registeredAgents.filter(a => (a.department || '').toLowerCase() === catItem.category.toLowerCase())
+          {/* Summary Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 28 }}>
+            {[
+              { label: 'Total Agents', value: registeredAgents.length, color: 'var(--accent)', icon: '👥' },
+              { label: 'Online Now', value: registeredAgents.filter(a => a.status === 'Online').length, color: '#10b981', icon: '🟢' },
+              { label: 'Departments', value: [...new Set(registeredAgents.map(a => a.department).filter(Boolean))].length, color: '#f59e0b', icon: '🏷️' },
+            ].map(stat => (
+              <div key={stat.label} className="card" style={{ padding: '18px 20px', textAlign: 'center', borderRadius: 14 }}>
+                <div style={{ fontSize: '1.6rem', marginBottom: 4 }}>{stat.icon}</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: stat.color }}>{stat.value}</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
 
-              // Active tickets in this category
-              const categoryTickets = tickets.filter(t => {
-                const c = (t.category || t.product_module || '').toLowerCase()
-                const catName = catItem.category.toLowerCase()
-                return c.includes(catName) || catName.includes(c)
-              })
+          {/* Agent Cards */}
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Loading agents...</div>
+          ) : registeredAgents.length === 0 ? (
+            <div className="card" style={{ padding: 48, textAlign: 'center', borderRadius: 16 }}>
+              <div style={{ fontSize: '3rem', marginBottom: 12 }}>🎧</div>
+              <h3 style={{ color: 'var(--text-primary)', marginBottom: 8 }}>No Agents Registered Yet</h3>
+              <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>
+                Agents appear here after they register through the Agent Portal.
+              </p>
+              <button
+                className="btn btn-primary"
+                onClick={() => navigate('/agent-login')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <UserPlus size={15} /> Go to Agent Registration
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+              {registeredAgents.map(agent => {
+                const deptStyle = getDeptStyle(agent.department)
+                const ticketCount = getAgentTicketCount(agent.email, agent.name)
+                const initials = agent.name.trim().split(/\s+/).map(n => n[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || 'AG'
+                const joinedDate = agent.registered_at ? new Date(agent.registered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'
 
-              return (
-                <div
-                  key={catItem.category}
-                  className="card"
-                  style={{ padding: 24, borderRadius: 16, background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontSize: '1.8rem', padding: '8px 12px', background: 'var(--bg-input)', borderRadius: 12, border: '1px solid var(--border)' }}>
-                        {catItem.icon}
-                      </span>
-                      <div>
-                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                          {catItem.category}
-                        </h3>
-                        <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
-                          {catItem.description}
-                        </p>
+                return (
+                  <div
+                    key={agent.email}
+                    className="card"
+                    style={{ padding: 20, borderRadius: 16, position: 'relative', overflow: 'hidden' }}
+                  >
+                    {/* Remove button */}
+                    <button
+                      onClick={() => handleRemoveAgent(agent.email)}
+                      title="Remove agent"
+                      style={{
+                        position: 'absolute', top: 14, right: 14,
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-muted)', padding: 4, borderRadius: 6,
+                        display: 'flex', alignItems: 'center', transition: 'color 0.2s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+
+                    {/* Avatar + Name */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+                      <div style={{
+                        width: 46, height: 46, borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #10b981, #059669)',
+                        color: '#ffffff', fontWeight: 800, fontSize: '1rem',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0, position: 'relative'
+                      }}>
+                        {initials}
+                        <span style={{
+                          position: 'absolute', bottom: 1, right: 1,
+                          width: 10, height: 10, borderRadius: '50%',
+                          background: '#10b981', border: '2px solid var(--bg-card)'
+                        }} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>
+                          {agent.name}
+                        </div>
+                        <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <Mail size={11} /> {agent.email}
+                        </div>
                       </div>
                     </div>
 
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      padding: '4px 12px', borderRadius: 20,
-                      background: categoryTickets.length > 0 ? 'rgba(16,185,129,0.1)' : 'var(--bg-input)',
-                      color: categoryTickets.length > 0 ? '#059669' : 'var(--text-muted)',
-                      fontSize: '0.78rem', fontWeight: 700, border: '1px solid var(--border)'
-                    }}>
-                      <Layers size={13} /> {categoryTickets.length} active tickets
-                    </span>
+                    {/* Department Badge */}
+                    <div style={{ marginBottom: 14 }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '5px 12px', borderRadius: 20, fontSize: '0.78rem', fontWeight: 700,
+                        background: deptStyle.bg, color: deptStyle.color,
+                        border: `1px solid ${deptStyle.color}30`
+                      }}>
+                        {deptStyle.icon} {agent.department || 'No Department Assigned'}
+                      </span>
+                    </div>
+
+                    {/* Stats Row */}
+                    <div style={{ display: 'flex', gap: 10, fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Layers size={12} /> {ticketCount} tickets
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Calendar size={12} /> Joined {joinedDate}
+                      </span>
+                    </div>
                   </div>
-
-                  {/* Registered Agents in this Category */}
-                  {catAgents.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12, marginTop: 16 }}>
-                      {catAgents.map(agent => (
-                        <div
-                          key={agent.email}
-                          style={{
-                            padding: '14px 18px', borderRadius: 12,
-                            background: 'var(--bg-input)', border: '1px solid var(--border)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <div style={{
-                              width: 38, height: 38, borderRadius: '50%',
-                              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                              color: '#ffffff', fontWeight: 800, fontSize: '0.85rem',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center'
-                            }}>
-                              {agent.name.split(' ').map(n => n[0]).join('')}
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                                {agent.name}
-                              </div>
-                              <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <Mail size={11} /> {agent.email}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div style={{ textAlign: 'right' }}>
-                            <span style={{
-                              display: 'inline-flex', alignItems: 'center', gap: 4,
-                              fontSize: '0.72rem', fontWeight: 700, color: '#10b981',
-                              background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: 10
-                            }}>
-                              ● Online
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{
-                      padding: '18px 20px', borderRadius: 10, background: 'var(--bg-input)',
-                      border: '1px border-dashed var(--border)', textAlign: 'center', color: 'var(--text-muted)',
-                      fontSize: '0.84rem', marginTop: 12
-                    }}>
-                      No agents registered in this category yet. Click "Register New Specialist Agent" above to add one.
-                    </div>
-                  )}
-
-                </div>
-              )
-            })}
-          </div>
-
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

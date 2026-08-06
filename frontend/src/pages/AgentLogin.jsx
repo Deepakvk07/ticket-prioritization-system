@@ -46,35 +46,56 @@ export default function AgentLogin() {
     setError('')
     setSuccess('')
 
-    const agentName = tab === 'register'
-      ? (fullName.trim() || email.split('@')[0])
-      : (email.split('@')[0] || 'Support Specialist')
-
     setTimeout(() => {
-      const newAgentObj = {
-        email: email.trim(),
-        role: 'agent',
-        name: agentName,
-        department: specialistCategory,
-        status: 'Online',
-        registered_at: new Date().toISOString()
-      }
+      let agentObj
 
-      // If registering a new agent, persist to registered_agents list
       if (tab === 'register') {
+        // Build new agent from registration form
+        agentObj = {
+          email: email.trim(),
+          role: 'agent',
+          name: fullName.trim() || email.split('@')[0],
+          department: specialistCategory,
+          status: 'Online',
+          registered_at: new Date().toISOString()
+        }
+        // Save to registered_agents list
         try {
           const existingRaw = localStorage.getItem('registered_agents')
           const existing = existingRaw ? JSON.parse(existingRaw) : []
-          const filtered = Array.isArray(existing) ? existing.filter(a => a && typeof a === 'object' && a.email && typeof a.email === 'string' && a.email.toLowerCase() !== email.trim().toLowerCase()) : []
-          filtered.push(newAgentObj)
+          const filtered = Array.isArray(existing)
+            ? existing.filter(a => a && typeof a === 'object' && a.email && a.email.toLowerCase() !== email.trim().toLowerCase())
+            : []
+          filtered.push(agentObj)
           localStorage.setItem('registered_agents', JSON.stringify(filtered))
-        } catch (e) {
-          localStorage.setItem('registered_agents', JSON.stringify([newAgentObj]))
+        } catch {
+          localStorage.setItem('registered_agents', JSON.stringify([agentObj]))
         }
+      } else {
+        // Sign-in: look up existing registered agent by email to restore their saved profile
+        let savedAgent = null
+        try {
+          const existingRaw = localStorage.getItem('registered_agents')
+          const existing = existingRaw ? JSON.parse(existingRaw) : []
+          savedAgent = Array.isArray(existing)
+            ? existing.find(a => a && a.email && a.email.toLowerCase() === email.trim().toLowerCase())
+            : null
+        } catch { savedAgent = null }
+
+        agentObj = savedAgent
+          ? { ...savedAgent, status: 'Online' }
+          : {
+              email: email.trim(),
+              role: 'agent',
+              name: email.split('@')[0] || 'Support Agent',
+              department: '',
+              status: 'Online',
+              registered_at: new Date().toISOString()
+            }
       }
 
       localStorage.setItem('user_role_mode', 'agent')
-      localStorage.setItem('demo_user', JSON.stringify(newAgentObj))
+      localStorage.setItem('demo_user', JSON.stringify(agentObj))
 
       setSuccess(tab === 'signin' ? 'Sign in successful! Loading agent queue...' : 'Agent account registered! Entering workspace...')
       setTimeout(() => {
