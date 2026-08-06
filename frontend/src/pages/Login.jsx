@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { registerCustomer, signInCustomer } from '../services/customers'
 import { Eye, EyeOff, ShieldCheck, CheckCircle2 } from 'lucide-react'
 
 export default function Login() {
@@ -34,41 +35,51 @@ export default function Login() {
       setError('Please enter your email address.')
       return
     }
+    if (!password.trim()) {
+      setError('Please enter your password.')
+      return
+    }
     setLoading(true)
     setError('')
     setSuccess('')
 
     const userName = fullName.trim() || email.split('@')[0]
-    const userEmail = email.trim()
-
-    const userObj = {
-      email: userEmail,
-      name: userName,
-      role: 'customer'
-    }
-
-    localStorage.setItem('user_role_mode', 'customer')
-    localStorage.setItem('demo_user', JSON.stringify(userObj))
+    const userEmail = email.trim().toLowerCase()
 
     try {
+      let userObj
       if (tab === 'signin') {
-        await supabase.auth.signInWithPassword({ email: userEmail, password }).catch(() => null)
+        // Try Supabase customers table first
+        userObj = await signInCustomer(userEmail, password)
+        if (!userObj) {
+          setError('No account found with these credentials. Please create an account first.')
+          setLoading(false)
+          return
+        }
       } else {
+        // Register new customer in Supabase
+        userObj = await registerCustomer({ name: userName, email: userEmail, password })
+        // Also try Supabase Auth
         await supabase.auth.signUp({
-          email: userEmail,
-          password,
+          email: userEmail, password,
           options: { data: { role: 'customer', full_name: userName } }
         }).catch(() => null)
       }
-    } catch (err) {
-      // Continue seamlessly
-    }
 
-    setSuccess(tab === 'signin' ? 'Sign in successful! Entering customer home...' : 'Account created! Entering customer home...')
-    setTimeout(() => {
-      navigate('/home')
-      window.location.reload()
-    }, 400)
+      localStorage.setItem('user_role_mode', 'customer')
+      localStorage.setItem('demo_user', JSON.stringify({ ...userObj, role: 'customer' }))
+
+      setSuccess(tab === 'signin' ? 'Sign in successful! Entering customer home...' : 'Account created! Entering customer home...')
+      setTimeout(() => {
+        navigate('/home')
+        window.location.reload()
+      }, 400)
+    } catch (err) {
+      console.error('Customer auth error:', err)
+      setError(err?.message || 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleOAuth = (provider) => {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { signInAdmin } from '../services/admins'
 import { Eye, EyeOff, ShieldCheck, CheckCircle2, ArrowLeft, Lock, Sparkles, Cpu } from 'lucide-react'
 
 export default function AdminLogin() {
@@ -30,19 +31,28 @@ export default function AdminLogin() {
       setError('Please enter a valid administrator email address.')
       return
     }
+    if (!password.trim()) {
+      setError('Please enter your password.')
+      return
+    }
 
     setLoading(true)
     setError('')
     setSuccess('')
 
-    const adminName = email.split('@')[0] ? (email.split('@')[0].toUpperCase() + ' (Admin)') : 'System Admin'
+    try {
+      const adminObj = await signInAdmin(email.trim(), password.trim())
+      if (!adminObj) {
+        setError('Invalid admin credentials. Please check your email and password.')
+        setLoading(false)
+        return
+      }
 
-    setTimeout(() => {
       localStorage.setItem('user_role_mode', 'admin')
       localStorage.setItem('demo_user', JSON.stringify({
-        email: email.trim(),
+        email: adminObj.email,
         role: 'admin',
-        name: adminName
+        name: adminObj.name
       }))
 
       setSuccess('Admin authentication granted! Entering control panel...')
@@ -50,7 +60,12 @@ export default function AdminLogin() {
         navigate('/dashboard')
         window.location.reload()
       }, 400)
-    }, 400)
+    } catch (err) {
+      console.error('Admin sign in error:', err)
+      setError(err?.message || 'Authentication failed. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

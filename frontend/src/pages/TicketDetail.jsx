@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTicket, addActivity, updateTicket, uploadToImgBB } from '../services/api'
+import { getTicketRating, saveTicketRating } from '../services/admins'
 import { ChevronRight, Paperclip, Send, ArrowLeft, X, Eye, FileText, Image as ImageIcon, Download, Star, RotateCcw, FileDown, CheckCircle2, Clock, AlertCircle, Loader } from 'lucide-react'
 
 // Fallback graphic figure if no image URL is provided
@@ -35,9 +36,9 @@ export default function TicketDetail({ user }) {
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
-  const [rating, setRating] = useState(() => { try { return parseInt(localStorage.getItem(`rating_${id}`) || '0') } catch { return 0 } })
+  const [rating, setRating] = useState(0)
   const [ratingHover, setRatingHover] = useState(0)
-  const [ratingSubmitted, setRatingSubmitted] = useState(() => !!localStorage.getItem(`rating_${id}`))
+  const [ratingSubmitted, setRatingSubmitted] = useState(false)
   const [replyFiles, setReplyFiles] = useState([])
   const [uploadingFiles, setUploadingFiles] = useState(false)
   const replyFileRef = useRef(null)
@@ -46,6 +47,16 @@ export default function TicketDetail({ user }) {
     getTicket(id)
       .then(t => { setTicket(t); setLoading(false) })
       .catch(() => { setTicket({ ...MOCK_TICKET, id }); setLoading(false) })
+  }, [id])
+
+  useEffect(() => {
+    // Load saved rating from Supabase
+    const userEmail = (() => { try { return JSON.parse(localStorage.getItem('demo_user') || '{}')?.email || '' } catch { return '' } })()
+    if (userEmail) {
+      getTicketRating(id, userEmail).then(r => {
+        if (r) { setRating(r); setRatingSubmitted(true) }
+      }).catch(() => null)
+    }
   }, [id])
 
   let demoUser = null
@@ -98,10 +109,12 @@ export default function TicketDetail({ user }) {
     await handleStatusChange('Open')
   }
 
-  const handleRating = (stars) => {
+  const handleRating = async (stars) => {
     setRating(stars)
     setRatingSubmitted(true)
-    localStorage.setItem(`rating_${id}`, String(stars))
+    // Save to Supabase
+    const userEmail = (() => { try { return JSON.parse(localStorage.getItem('demo_user') || '{}')?.email || '' } catch { return '' } })()
+    try { await saveTicketRating(id, stars, userEmail) } catch { /* ignore */ }
   }
 
   const handleReplyFileAdd = async (files) => {

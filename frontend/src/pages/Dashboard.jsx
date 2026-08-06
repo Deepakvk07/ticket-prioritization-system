@@ -4,6 +4,7 @@ import { Ticket, CheckCircle, Clock, Plus, Filter, Download, ChevronRight, Spark
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets, updateTicket } from '../services/api'
+import { getAgents } from '../services/agents'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 const statusClass = { Open: 'open', 'In Progress': 'progress', 'On Hold': 'hold', Resolved: 'resolved' }
@@ -19,36 +20,7 @@ const CATEGORIES_LIST = [
   { name: 'Technical Support', icon: '🛠️' },
 ]
 
-/**
- * Safely retrieve registered agents from localStorage (no hardcoded demo agents!)
- */
-function getRegisteredAgentsFromStorage() {
-  try {
-    const raw = localStorage.getItem('registered_agents')
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.map(item => {
-      if (typeof item === 'string') {
-        return { name: item, email: `${item.toLowerCase().replace(/\s+/g, '.')}@omnisupport.ai`, department: 'Technical Support' }
-      }
-      if (item && typeof item === 'object') {
-        return {
-          name: item.name || (item.email ? item.email.split('@')[0] : 'Support Specialist'),
-          email: item.email || `agent_${Math.random().toString(36).substring(2, 7)}@omnisupport.ai`,
-          department: item.department || 'Technical Support'
-        }
-      }
-      return null
-    }).filter(Boolean)
-  } catch {
-    return []
-  }
-}
 
-/**
- * Get registered agents matching a ticket's category
- */
 function getAgentsForCategory(ticketCategory, registeredAgents) {
   const cat = (ticketCategory || '').toLowerCase()
 
@@ -65,6 +37,7 @@ function getAgentsForCategory(ticketCategory, registeredAgents) {
   return matched.length > 0 ? matched : registeredAgents
 }
 
+
 export default function Dashboard({ user }) {
   const navigate = useNavigate()
   const [tickets, setTickets] = useState([])
@@ -78,7 +51,10 @@ export default function Dashboard({ user }) {
   const isAdmin = activeRole === 'admin'
 
   useEffect(() => {
-    setRegisteredAgents(getRegisteredAgentsFromStorage())
+    // Load agents from Supabase (shared across all portals)
+    getAgents()
+      .then(agents => setRegisteredAgents(agents))
+      .catch(() => setRegisteredAgents([]))
 
     getTickets({ limit: 50 })
       .then(res => {

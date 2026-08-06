@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets, updateTicket } from '../services/api'
+import { getAgents } from '../services/agents'
 import { Filter, ChevronRight, ShieldCheck, Layers, UserCheck, Download } from 'lucide-react'
 
 const priorityClass = { Critical: 'critical', High: 'high', Medium: 'medium', Low: 'low' }
@@ -51,29 +52,6 @@ function getTicketDepartment(ticket) {
   return ['Technical Support']
 }
 
-function getRegisteredAgentsFromStorage() {
-  try {
-    const raw = localStorage.getItem('registered_agents')
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.map(item => {
-      if (typeof item === 'string') {
-        return { name: item, email: `${item.toLowerCase().replace(/\s+/g, '.')}@omnisupport.ai`, department: 'Technical Support' }
-      }
-      if (item && typeof item === 'object') {
-        return {
-          name: item.name || (item.email ? item.email.split('@')[0] : 'Support Specialist'),
-          email: item.email || `agent_${Math.random().toString(36).substring(2, 7)}@omnisupport.ai`,
-          department: item.department || 'Technical Support'
-        }
-      }
-      return null
-    }).filter(Boolean)
-  } catch {
-    return []
-  }
-}
 
 export default function TicketQueue({ user }) {
   const navigate = useNavigate()
@@ -92,7 +70,10 @@ export default function TicketQueue({ user }) {
   const agentDepartment = demoUser.department || ''
 
   useEffect(() => {
-    setRegisteredAgents(getRegisteredAgentsFromStorage())
+    // Load agents from Supabase
+    getAgents()
+      .then(agents => setRegisteredAgents(agents))
+      .catch(() => setRegisteredAgents([]))
 
     getTickets()
       .then(res => setTickets(Array.isArray(res) ? res : []))
