@@ -89,6 +89,7 @@ export default function TicketQueue({ user }) {
   const activeRole = demoUser.role || localStorage.getItem('user_role_mode') || 'customer'
   const isAgent = activeRole === 'agent'
   const isAdmin = activeRole === 'admin'
+  const agentDepartment = demoUser.department || ''
 
   useEffect(() => {
     setRegisteredAgents(getRegisteredAgentsFromStorage())
@@ -129,7 +130,7 @@ export default function TicketQueue({ user }) {
     if (priorityFilter && t.priority !== priorityFilter) return false
 
     // If logged in as an Agent, only show tickets assigned specifically to them OR matching their department
-    if (isAgent && userRoleMode === 'agent') {
+    if (isAgent) {
       const isDirectlyAssigned = (t.assigned_agent && t.assigned_agent.toLowerCase().includes(demoUser.name?.toLowerCase() || '___')) ||
                                  (t.assigned_agent_email && t.assigned_agent_email === demoUser.email)
       const ticketDepts = getTicketDepartment(t)
@@ -163,7 +164,7 @@ export default function TicketQueue({ user }) {
           </div>
 
           {/* Agent Specialist Banner */}
-          {isAgent && userRoleMode === 'agent' && (
+          {isAgent && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '14px 20px', marginBottom: 20, borderRadius: 12,

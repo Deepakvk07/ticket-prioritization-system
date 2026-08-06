@@ -31,8 +31,8 @@ export default function TicketHistory({ user }) {
     try { return JSON.parse(localStorage.getItem('demo_user') || '{}') } catch { return {} }
   })()
   const agentDepartment = demoUser.department || ''
-  const isAgent = demoUser.role === 'agent'
-  const userRoleMode = localStorage.getItem('user_role_mode')
+  const activeRole = demoUser.role || localStorage.getItem('user_role_mode') || 'customer'
+  const isAgent = activeRole === 'agent'
 
   useEffect(() => {
     getTickets()
@@ -47,7 +47,7 @@ export default function TicketHistory({ user }) {
     if (!isResolved) return false
 
     // Agent specialist filter
-    if (isAgent && agentDepartment && userRoleMode === 'agent') {
+    if (isAgent && agentDepartment) {
       const dept = getTicketDepartment(t)
       if (dept !== agentDepartment) return false
     }
