@@ -6,6 +6,7 @@ import Sidebar from '../components/Sidebar'
 import { getTickets, updateTicket } from '../services/api'
 import { getAgents } from '../services/agents'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { useTranslation } from '../lib/i18n'
 
 const statusClass = { Open: 'open', 'In Progress': 'progress', 'On Hold': 'hold', Resolved: 'resolved' }
 const priorityClass = { Critical: 'critical', High: 'high', Medium: 'medium', Low: 'low' }
@@ -39,6 +40,7 @@ function getAgentsForCategory(ticketCategory, registeredAgents) {
 
 
 export default function Dashboard({ user }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [tickets, setTickets] = useState([])
   const [registeredAgents, setRegisteredAgents] = useState([])
@@ -51,27 +53,18 @@ export default function Dashboard({ user }) {
   const isAdmin = activeRole === 'admin'
 
   useEffect(() => {
-    // Load agents from Supabase (shared across all portals)
-    getAgents()
-      .then(agents => setRegisteredAgents(agents))
-      .catch(() => setRegisteredAgents([]))
-
-    getTickets({ limit: 50 })
-      .then(res => {
-        setTickets(Array.isArray(res) ? res : [])
-      })
+    getAgents().then(setRegisteredAgents).catch(() => setRegisteredAgents([]))
+    getTickets()
+      .then(res => setTickets(Array.isArray(res) ? res : []))
       .catch(() => setTickets([]))
       .finally(() => setLoading(false))
   }, [])
 
-  // Sort tickets strictly by Priority (Critical -> High -> Medium -> Low), then Score
   const sortedTickets = [...tickets].sort((a, b) => {
-    const pA = PRIORITY_ORDER[a.priority] || 5
-    const pB = PRIORITY_ORDER[b.priority] || 5
+    const pA = PRIORITY_ORDER[a.priority] || 99
+    const pB = PRIORITY_ORDER[b.priority] || 99
     if (pA !== pB) return pA - pB
-    const sA = a.score || (a.priority === 'Critical' ? 96 : a.priority === 'High' ? 78 : a.priority === 'Medium' ? 54 : 28)
-    const sB = b.score || (b.priority === 'Critical' ? 96 : b.priority === 'High' ? 78 : b.priority === 'Medium' ? 54 : 28)
-    return sB - sA
+    return (b.score || b.confidence_score || 0) - (a.score || a.confidence_score || 0)
   })
 
   const handleAssignAgent = async (ticketId, agentObj) => {
@@ -84,7 +77,6 @@ export default function Dashboard({ user }) {
         status: 'In Progress'
       }).catch(() => null)
 
-      // Update local state immediately
       setTickets(prev => prev.map(t => {
         if (t.id === ticketId) {
           return {
@@ -112,19 +104,19 @@ export default function Dashboard({ user }) {
     inProgress: sortedTickets.filter(t => t.status === 'In Progress').length
   }
 
-  // Clean greeting name format
   let rawName = demoUser?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Administrator'
   if (rawName.includes('(')) rawName = rawName.split('(')[0].trim()
   const greetingName = rawName || 'Administrator'
 
   const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const greetingKey = hour < 12 ? 'good_morning' : hour < 17 ? 'good_afternoon' : 'good_evening'
+  const greetingText = t(greetingKey)
 
   return (
     <div className="app-layout">
       <Sidebar user={user} />
       <div className="main-content">
-        <Topbar user={user} placeholder="Search tickets, documentation, or help..." />
+        <Topbar user={user} placeholder={t('search_placeholder')} />
         <div className="page-body animate-fade">
 
           {/* Welcome Banner */}
@@ -143,10 +135,10 @@ export default function Dashboard({ user }) {
                 background: 'rgba(255,255,255,0.15)', color: 'white'
               }}>
                 {isAdmin ? <ShieldCheck size={14} /> : <UserCheck size={14} />}
-                {isAdmin ? 'ADMIN / TRIAGE CONTROL CENTER' : 'CUSTOMER SUPPORT PORTAL'}
+                {isAdmin ? t('admin_portal').toUpperCase() : t('customer_portal').toUpperCase()}
               </div>
               <h2 style={{ fontSize: '1.6rem', fontWeight: 700, marginBottom: 8, color: '#ffffff' }}>
-                {greeting}, {greetingName}.
+                {greetingText}, {greetingName}.
               </h2>
               <p style={{ color: 'rgba(255,255,255,0.85)', maxWidth: 540, lineHeight: 1.6, fontSize: '0.92rem' }}>
                 {isAdmin
@@ -159,7 +151,7 @@ export default function Dashboard({ user }) {
               onClick={() => navigate('/tickets/new')}
               style={{ background: isAdmin ? 'var(--accent)' : '#10b981' }}
             >
-              <Plus size={18} /> {isAdmin ? 'Create Internal Ticket' : 'Submit a New Ticket'}
+              <Plus size={18} /> {isAdmin ? t('create_internal_ticket') : t('create_ticket')}
             </button>
           </div>
 
@@ -177,7 +169,7 @@ export default function Dashboard({ user }) {
           {/* Essential KPI Summary Bar */}
           <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
             <div className="card" style={{ padding: 20, borderRadius: 16, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>TOTAL TICKETS</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>{t('total_tickets').toUpperCase()}</div>
               <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{stats.total}</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>System total</div>
             </div>
@@ -320,7 +312,7 @@ export default function Dashboard({ user }) {
                   }}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
-                  <Download size={14} /> Export Tickets (CSV)
+                  <Download size={14} /> {t('export_csv')}
                 </button>
                 <button className="btn btn-primary btn-sm" onClick={() => navigate('/tickets')}>Open Workspace Queue</button>
               </div>
@@ -329,14 +321,14 @@ export default function Dashboard({ user }) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Priority Level</th>
-                    <th>AI Score</th>
-                    <th>Ticket Subject</th>
-                    <th>Category</th>
-                    <th>Assigned Registered Agent</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Action</th>
+                    <th>{t('priority_level')}</th>
+                    <th>{t('ai_score')}</th>
+                    <th>{t('ticket_subject')}</th>
+                    <th>{t('category')}</th>
+                    <th>{t('assigned_agent')}</th>
+                    <th>{t('status')}</th>
+                    <th>{t('created')}</th>
+                    <th>{t('action')}</th>
                   </tr>
                 </thead>
                 <tbody>

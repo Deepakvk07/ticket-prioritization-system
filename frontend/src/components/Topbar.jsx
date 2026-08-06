@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Search, Bell, HelpCircle, Sun, Moon, X, Ticket, CheckCircle2, AlertCircle, LayoutDashboard, Headphones, BarChart2, Cpu, Home, LogOut, Zap } from 'lucide-react'
 import { useNavigate, useLocation, NavLink } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useTranslation } from '../lib/i18n'
 
 function getNotifications() {
   try { return JSON.parse(localStorage.getItem('tf_notifications') || '[]') } catch { return [] }
@@ -10,26 +11,8 @@ function saveNotifications(notifs) {
   localStorage.setItem('tf_notifications', JSON.stringify(notifs))
 }
 
-const ADMIN_NAV = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/tickets', icon: Ticket, label: 'Ticket Queue' },
-  { to: '/agents', icon: Headphones, label: 'Agent Management' },
-  { to: '/analytics', icon: BarChart2, label: 'Analytics' },
-  { to: '/model', icon: Cpu, label: 'Model' },
-]
-
-const AGENT_NAV = [
-  { to: '/tickets', icon: Ticket, label: 'Assigned Tickets' },
-]
-
-const CUSTOMER_NAV = [
-  { to: '/home', icon: Home, label: 'Home' },
-  { to: '/tickets', icon: Ticket, label: 'My Tickets' },
-  { to: '/track', icon: Search, label: 'Track Ticket' },
-  { to: '/faq', icon: HelpCircle, label: 'FAQ / Help' },
-]
-
-export default function Topbar({ user, placeholder = 'Search tickets, agents, or help...' }) {
+export default function Topbar({ user, placeholder }) {
+  const { t, lang } = useTranslation()
   const [query, setQuery] = useState('')
   const [showNotifs, setShowNotifs] = useState(false)
   const [notifications, setNotifications] = useState(getNotifications())
@@ -42,6 +25,26 @@ export default function Topbar({ user, placeholder = 'Search tickets, agents, or
     try { return JSON.parse(localStorage.getItem('demo_user') || '{}') } catch { return {} }
   })()
   const activeRole = demoUser.role || localStorage.getItem('user_role_mode') || 'customer'
+  
+  const ADMIN_NAV = [
+    { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard') },
+    { to: '/tickets', icon: Ticket, label: t('ticket_queue') },
+    { to: '/agents', icon: Headphones, label: t('agent_management') },
+    { to: '/analytics', icon: BarChart2, label: t('analytics') },
+    { to: '/model', icon: Cpu, label: t('model') },
+  ]
+
+  const AGENT_NAV = [
+    { to: '/tickets', icon: Ticket, label: t('assigned_tickets') || 'Assigned Tickets' },
+  ]
+
+  const CUSTOMER_NAV = [
+    { to: '/home', icon: Home, label: t('home') },
+    { to: '/tickets', icon: Ticket, label: t('my_tickets') },
+    { to: '/track', icon: Search, label: t('track_ticket') },
+    { to: '/faq', icon: HelpCircle, label: t('faq_help') },
+  ]
+
   const navItems = activeRole === 'admin' ? ADMIN_NAV : activeRole === 'agent' ? AGENT_NAV : CUSTOMER_NAV
 
   const userName = demoUser.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
