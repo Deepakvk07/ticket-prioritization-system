@@ -2,11 +2,12 @@ import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
-import { createTicket, uploadToImgBB, getTickets } from '../services/api'
+import { createTicket, uploadToImgBB } from '../services/api'
 import {
-  Settings, RefreshCw, HelpCircle, Send, Copy, ExternalLink,
-  Search, CheckCircle2, AlertCircle, Upload, X, Bold, Italic, List, Link2, AtSign,
-  MessageSquare, ShieldCheck, FileText, ArrowRight, User
+  Sparkles, PlusCircle, CheckCircle2, AlertCircle,
+  Cpu, Send, Pencil, Bold, Italic, List, Link2, AtSign,
+  HelpCircle, MessageSquare, Upload, X, ShieldCheck, Activity, RotateCcw,
+  Copy, ExternalLink
 } from 'lucide-react'
 
 export default function HomePage({ user }) {
@@ -14,17 +15,19 @@ export default function HomePage({ user }) {
   const email = user?.email || ''
   const userName = user?.name || user?.user_metadata?.full_name || (email ? email.split('@')[0] : 'Valued Customer')
 
+  // Modal Popup Toggle State
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Custom Category State
+  const [isCustomCategory, setIsCustomCategory] = useState(false)
+
   // Form State
-  const [activeTab, setActiveTab] = useState('home') // 'home' | 'new-ticket' | 'status-check' | 'faq'
   const [subject, setSubject] = useState('')
   const [category, setCategory] = useState('Technical Support')
   const [description, setDescription] = useState('')
   const [contactEmail, setContactEmail] = useState(email)
   const [files, setFiles] = useState([])
   const [dragOver, setDragOver] = useState(false)
-
-  // Ticket Search / Track State
-  const [searchCode, setSearchCode] = useState('')
 
   const textareaRef = useRef(null)
 
@@ -33,9 +36,9 @@ export default function HomePage({ user }) {
   const [submittedTicket, setSubmittedTicket] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [copied, setCopied] = useState(false)
-  const [duplicateWarning, setDuplicateWarning] = useState(null)
+  const [duplicateWarning, setDuplicateWarning] = useState(null) // {id, subject}
 
-  // Formatting Toolbar
+  // Active Formatting Toolbar Actions
   const insertFormatting = (syntaxStart, syntaxEnd = '') => {
     const textarea = textareaRef.current
     if (!textarea) return
@@ -51,7 +54,7 @@ export default function HomePage({ user }) {
     }, 50)
   }
 
-  // Handle Drag & Drop
+  // Drag & drop file handler
   const handleDrop = (e) => {
     e.preventDefault()
     setDragOver(false)
@@ -59,16 +62,19 @@ export default function HomePage({ user }) {
     setFiles(f => [...f, ...dropped])
   }
 
-  // Handle Ticket Submit
+  // Handle Form Submit
   const handleSubmit = async (e, forceSubmit = false) => {
     if (e && e.preventDefault) e.preventDefault()
     if (!subject.trim() || !description.trim()) return
 
     setSubmitting(true)
     setErrorMsg('')
+    setSubmittedTicket(null)
 
+    // Check for duplicate tickets (similar subject, open status) unless forceSubmit is true
     if (!forceSubmit) {
       try {
+        const { getTickets } = await import('../services/api')
         const existing = await getTickets({ status: 'Open' })
         const subjLower = subject.toLowerCase().trim()
         const dup = existing.find(t =>
@@ -83,12 +89,16 @@ export default function HomePage({ user }) {
           setSubmitting(false)
           return
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore errors in duplicate check */ }
     }
 
     setDuplicateWarning(null)
 
+    // Generate human-readable ticket code e.g. TK-8842
+    const generatedCode = `TK-${Math.floor(1000 + Math.random() * 9000)}`
+
     try {
+      // Process attached files — upload images to ImgBB, read text files as text
       const attachmentData = await Promise.all(
         files.map(async (f) => {
           const sizeStr = `${(f.size / 1024).toFixed(1)} KB`
@@ -97,16 +107,18 @@ export default function HomePage({ user }) {
               const imgbb = await uploadToImgBB(f)
               return { name: f.name, size: sizeStr, type: 'image', url: imgbb.url }
             } catch {
+              // If ImgBB fails, store image as base64 data URL
               return new Promise((resolve) => {
                 const reader = new FileReader()
-                reader.onload = (ev) => resolve({ name: f.name, size: sizeStr, type: 'image', url: ev.target.result })
+                reader.onload = (e) => resolve({ name: f.name, size: sizeStr, type: 'image', url: e.target.result })
                 reader.readAsDataURL(f)
               })
             }
           } else {
+            // For text/log files, read as text content
             return new Promise((resolve) => {
               const reader = new FileReader()
-              reader.onload = (ev) => resolve({ name: f.name, size: sizeStr, type: 'text', content: ev.target.result, url: null })
+              reader.onload = (e) => resolve({ name: f.name, size: sizeStr, type: 'text', content: e.target.result, url: null })
               reader.onerror = () => resolve({ name: f.name, size: sizeStr, type: 'text', content: '', url: null })
               reader.readAsText(f)
             })
@@ -115,18 +127,28 @@ export default function HomePage({ user }) {
       )
 
       const payload = {
-        subject,
-        description,
+        subject: subject,
+        description: description,
         category: category || 'Technical Support',
         product_module: category || 'Technical Support',
         customer_name: userName,
         customer_email: contactEmail || email || '',
         priority: 'High',
+        ai_priority: 'High',
+        confidence_score: 90.0,
         attachments: attachmentData
       }
 
       const ticket = await createTicket(payload)
-      setSubmittedTicket(ticket)
+      const ticketIdCode = ticket.code || (ticket.id ? (ticket.id.length < 10 ? ticket.id.toUpperCase() : `TK-${ticket.id.slice(0, 5).toUpperCase()}`) : generatedCode)
+
+      setSubmittedTicket({
+        id: ticket.id,
+        code: ticketIdCode,
+        subject: subject
+      })
+
+      // Reset form
       setSubject('')
       setDescription('')
       setFiles([])
@@ -135,12 +157,6 @@ export default function HomePage({ user }) {
     } finally {
       setSubmitting(false)
     }
-  }
-
-  const handleTrackSearch = (e) => {
-    e.preventDefault()
-    if (!searchCode.trim()) return
-    navigate(`/track?id=${encodeURIComponent(searchCode.trim())}`)
   }
 
   const copyToClipboard = (text) => {
@@ -153,479 +169,445 @@ export default function HomePage({ user }) {
     <div className="app-layout">
       <Sidebar user={user} />
       <div className="main-content">
-        <Topbar user={user} placeholder="Search knowledge base, tickets..." />
+        <Topbar user={user} placeholder="Search knowledge base, documentation, tickets..." />
 
         <div className="page-body animate-fade">
 
           <style>{`
-            .helpdesk-header-bar {
-              background: #0f172a;
-              color: #f8fafc;
-              border-radius: 12px 12px 0 0;
-              padding: 12px 24px;
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              font-size: 0.88rem;
-              border: 1px solid rgba(255, 255, 255, 0.1);
-              border-bottom: none;
-            }
-
-            .helpdesk-nav-link {
-              color: #94a3b8;
-              text-decoration: none;
-              font-weight: 500;
-              cursor: pointer;
-              transition: color 0.2s;
-              background: none;
-              border: none;
-              font-size: 0.86rem;
-            }
-
-            .helpdesk-nav-link:hover, .helpdesk-nav-link.active {
-              color: #38bdf8;
-            }
-
-            .portal-hero-banner {
+            .home-hero-card {
               position: relative;
-              background: linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.95) 100%), url('/login_hero_bg.jpg') center/cover;
-              border-radius: 0 0 16px 16px;
-              padding: 48px 40px;
-              text-align: center;
-              color: #ffffff;
-              border: 1px solid rgba(255, 255, 255, 0.1);
-              box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-              margin-bottom: 32px;
+              border-radius: 20px;
+              padding: 44px 48px;
+              margin-bottom: 28px;
+              background: linear-gradient(135deg, rgba(13, 22, 41, 0.95) 0%, rgba(17, 28, 51, 0.95) 100%);
+              border: 1px solid rgba(59, 130, 246, 0.25);
+              box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+              overflow: hidden;
             }
 
-            .portal-hero-title {
-              font-size: 2.2rem;
-              font-weight: 900;
-              letter-spacing: 0.05em;
-              text-transform: uppercase;
-              color: #ffffff;
-              margin-bottom: 14px;
-              text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            .hero-badge-pill {
+              display: inline-flex;
+              align-items: center;
+              gap: 8px;
+              padding: 6px 14px;
+              border-radius: 20px;
+              background: rgba(59, 130, 246, 0.12);
+              border: 1px solid rgba(59, 130, 246, 0.35);
+              color: #60a5fa;
+              font-size: 0.8rem;
+              font-weight: 700;
+              letter-spacing: 0.04em;
+              margin-bottom: 18px;
             }
 
-            .portal-hero-desc {
-              font-size: 0.94rem;
-              color: #cbd5e1;
-              line-height: 1.7;
-              max-width: 820px;
-              margin: 0 auto;
-            }
-
-            .helpdesk-card-grid {
-              display: grid;
-              grid-template-columns: repeat(3, 1fr);
-              gap: 24px;
-              margin-bottom: 36px;
-            }
-
-            @media (max-width: 900px) {
-              .helpdesk-card-grid {
-                grid-template-columns: 1fr;
-              }
-            }
-
-            .portal-action-card {
-              background: var(--bg-card);
-              border: 1px solid var(--border);
+            .query-card {
               border-radius: 16px;
-              padding: 32px 28px;
-              text-align: center;
+              padding: 28px 36px;
+              margin-bottom: 28px;
+              background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(13, 22, 41, 0.9) 100%);
+              border: 1px solid rgba(16, 185, 129, 0.3);
+              box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
               display: flex;
-              flex-direction: column;
               align-items: center;
               justify-content: space-between;
-              transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-              box-shadow: var(--shadow-sm);
+              flex-wrap: wrap;
+              gap: 20px;
+              transition: transform 0.2s ease, border-color 0.2s ease;
             }
 
-            .portal-action-card:hover {
-              transform: translateY(-5px);
-              border-color: #6366f1;
-              box-shadow: 0 16px 32px rgba(99, 102, 241, 0.15);
+            .query-card:hover {
+              border-color: rgba(16, 185, 129, 0.5);
             }
 
-            .card-icon-badge {
-              width: 58px;
-              height: 58px;
-              border-radius: 16px;
-              display: flex;
+            .query-btn {
+              display: inline-flex;
               align-items: center;
-              justify-content: center;
-              margin-bottom: 18px;
-              transition: transform 0.3s ease;
-            }
-
-            .portal-action-card:hover .card-icon-badge {
-              transform: scale(1.1) rotate(4deg);
-            }
-
-            .action-btn-primary {
-              background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-              color: #ffffff;
+              gap: 10px;
+              padding: 14px 30px;
+              border-radius: 12px;
+              font-size: 0.95rem;
               font-weight: 700;
-              font-size: 0.9rem;
-              padding: 11px 24px;
-              border-radius: 10px;
+              color: #ffffff;
+              background: linear-gradient(135deg, #10b981 0%, #059669 100%);
               border: none;
               cursor: pointer;
-              box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
-              transition: all 0.2s ease;
-              width: 100%;
-              margin-top: 18px;
+              box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+              transition: all 0.25s ease;
             }
 
-            .action-btn-primary:hover {
+            .query-btn:hover {
               transform: translateY(-2px);
-              box-shadow: 0 8px 22px rgba(99, 102, 241, 0.45);
+              box-shadow: 0 8px 26px rgba(16, 185, 129, 0.45);
             }
 
-            .helpdesk-footer-bar {
-              background: var(--bg-card);
-              border: 1px solid var(--border);
-              border-radius: 14px;
-              padding: 20px 28px;
-              text-align: center;
-              color: var(--text-muted);
-              font-size: 0.84rem;
-              margin-top: 32px;
+            .modal-backdrop {
+              position: fixed;
+              inset: 0;
+              z-index: 1100;
+              background: rgba(5, 10, 22, 0.7);
+              backdrop-filter: blur(16px);
+              -webkit-backdrop-filter: blur(16px);
+              display: flex;
+              align-items: flex-start;
+              justify-content: center;
+              padding: 60px 24px 30px;
+              overflow-y: auto;
+              animation: fadeIn 0.2s ease;
+            }
+
+            .modal-content-card {
+              width: 100%;
+              max-width: 820px;
+              margin-top: 10px;
+              max-height: calc(100vh - 100px);
+              overflow-y: auto;
+              background: #0b1220;
+              border: 1px solid rgba(59, 130, 246, 0.35);
+              border-radius: 20px;
+              padding: 36px 40px;
+              box-shadow: 0 30px 70px rgba(0, 0, 0, 0.75);
+              animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+
+            @keyframes scaleUp {
+              from { opacity: 0; transform: scale(0.95); }
+              to { opacity: 1; transform: scale(1); }
+            }
+
+            .modal-field-label {
+              font-size: 0.88rem;
+              font-weight: 600;
+              color: var(--text-primary);
+              margin-bottom: 8px;
+              display: block;
             }
 
             .modal-input {
               width: 100%;
-              padding: 12px 16px;
+              padding: 13px 16px;
               border-radius: 10px;
               border: 1px solid var(--border);
               background: var(--bg-input);
               color: var(--text-primary);
-              font-size: 0.92rem;
+              font-size: 0.94rem;
               outline: none;
+              transition: border-color 0.2s ease, box-shadow 0.2s ease;
             }
 
             .modal-input:focus {
-              border-color: #6366f1;
-              box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+              border-color: var(--accent);
+              box-shadow: 0 0 0 3px var(--accent-glow);
+            }
+
+            .feature-glass-card {
+              border-radius: 16px;
+              padding: 26px;
+              background: #0d1525;
+              border: 1px solid rgba(255, 255, 255, 0.08);
+              transition: all 0.25s ease;
+            }
+
+            .feature-glass-card:hover {
+              border-color: rgba(59, 130, 246, 0.35);
+              transform: translateY(-3px);
             }
           `}</style>
 
-          {/* ── Top Dark Navigation Header Bar ───────────────────────────────── */}
-          <div className="helpdesk-header-bar">
-            <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <img src="/ticketflow_logo.jpg" alt="Logo" style={{ width: 22, height: 22, borderRadius: 6, objectFit: 'cover' }} />
-              <span>TicketFlow.ai : Support Helpdesk</span>
-            </div>
-            <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-              <button
-                className={`helpdesk-nav-link ${activeTab === 'home' ? 'active' : ''}`}
-                onClick={() => setActiveTab('home')}
-              >
-                Support Center Home
-              </button>
-              <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
-              <button
-                className={`helpdesk-nav-link ${activeTab === 'new-ticket' ? 'active' : ''}`}
-                onClick={() => setActiveTab('new-ticket')}
-              >
-                Open a New Ticket
-              </button>
-              <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
-              <button
-                className={`helpdesk-nav-link ${activeTab === 'status-check' ? 'active' : ''}`}
-                onClick={() => setActiveTab('status-check')}
-              >
-                Check Ticket Status
-              </button>
-            </div>
-          </div>
-
-          {/* ── Main Hero Banner (Matching requested Customer Portal design) ──── */}
-          <div className="portal-hero-banner">
-            <h1 className="portal-hero-title">CUSTOMER-TICKET PORTAL</h1>
-            <p className="portal-hero-desc">
-              In order to streamline support requests and better serve you, we utilize a support ticket system.
-              Every support request is assigned a unique ticket number which you can use to track the progress
-              and responses online. For your reference we provide complete archives and history of all your support requests.
-              A valid email address is required to submit a ticket.
-            </p>
-          </div>
-
-          {/* ── 3 Main Portal Action Cards Grid ─────────────────────────────── */}
-          <div className="helpdesk-card-grid">
-
-            {/* Card 1: Open a New Ticket */}
-            <div className="portal-action-card">
-              <div className="card-icon-badge" style={{ background: 'rgba(99, 102, 241, 0.12)', color: '#6366f1', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
-                <Settings size={28} />
-              </div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 10 }}>
-                Open a New Ticket
-              </h3>
-              <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', lineHeight: 1.6, flex: 1 }}>
-                Please provide as much detail as possible so we can best assist you. To update a previously submitted ticket, please sign in.
-              </p>
-              <button
-                className="action-btn-primary"
-                onClick={() => setActiveTab('new-ticket')}
-              >
-                Open a New Ticket
-              </button>
-            </div>
-
-            {/* Card 2: Check Ticket Status */}
-            <div className="portal-action-card">
-              <div className="card-icon-badge" style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
-                <RefreshCw size={28} />
-              </div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 10 }}>
-                Check Ticket Status
-              </h3>
-              <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', lineHeight: 1.6, flex: 1 }}>
-                We provide archives and history of all your current and past support requests complete with specialist responses.
-              </p>
-              <button
-                className="action-btn-primary"
-                style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)' }}
-                onClick={() => setActiveTab('status-check')}
-              >
-                Check Ticket Status
-              </button>
-            </div>
-
-            {/* Card 3: Frequently Asked Questions */}
-            <div className="portal-action-card">
-              <div className="card-icon-badge" style={{ background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
-                <HelpCircle size={28} />
-              </div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 10 }}>
-                Frequently Asked Questions
-              </h3>
-              <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', lineHeight: 1.6, flex: 1 }}>
-                Be sure to browse our Frequently Asked Questions and documentation articles before opening a new ticket.
-              </p>
-              <button
-                className="action-btn-primary"
-                style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)' }}
-                onClick={() => navigate('/faq')}
-              >
-                Search FAQ & Knowledge Base
-              </button>
-            </div>
-
-          </div>
-
-          {/* ── Active Tab View: Open New Ticket Form ──────────────────────── */}
-          {activeTab === 'new-ticket' && (
-            <div className="card" style={{ padding: '36px 40px', borderRadius: 20, marginBottom: 32 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <Settings size={22} color="#6366f1" />
-                  <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                    Submit a Support Ticket
-                  </h2>
+          {/* ── High-Impact Hero Banner ────────────────────────────────────────── */}
+          <div className="home-hero-card">
+            <div style={{ position: 'relative', zIndex: 2, maxWidth: 800, display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+              <img src="/ticketflow_logo.jpg" alt="TicketFlow AI Logo" style={{ width: 76, height: 76, borderRadius: 20, border: '2px solid rgba(255, 255, 255, 0.3)', boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4)', objectFit: 'cover', flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 260 }}>
+                <div className="hero-badge-pill">
+                  <Sparkles size={14} /> TicketFlow AI Customer Portal
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={() => setActiveTab('home')}>Close Form</button>
-              </div>
 
-              {submittedTicket ? (
-                <div style={{ padding: 32, borderRadius: 16, background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', textAlign: 'center' }}>
-                  <CheckCircle2 size={54} color="#10b981" style={{ margin: '0 auto 16px' }} />
-                  <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8 }}>
-                    Thank you! Your ticket has been registered.
-                  </h3>
-                  <div style={{ background: 'var(--bg-input)', padding: '14px 24px', borderRadius: 12, display: 'inline-block', margin: '16px 0', border: '1px solid rgba(16,185,129,0.3)' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>YOUR UNIQUE TICKET ID</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#10b981', fontFamily: 'monospace' }}>
-                      {submittedTicket.ticket_code || submittedTicket.code || 'TK-NEW'}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16 }}>
-                    <button className="btn btn-primary" onClick={() => navigate(`/tickets/${submittedTicket.id}`)}>
-                      View Ticket Details
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => setSubmittedTicket(null)}>
-                      Submit Another Ticket
-                    </button>
-                  </div>
+                <h1 style={{
+                  fontSize: '2.4rem', fontWeight: 800, color: '#ffffff',
+                  lineHeight: 1.2, letterSpacing: '-0.025em', marginBottom: 10
+                }}>
+                  TicketFlow AI Resolution Hub
+                </h1>
+
+                <p style={{
+                  fontSize: '0.98rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 0
+                }}>
+                  Welcome back, <strong style={{ color: '#f8fafc' }}>{userName}</strong>. Track your existing tickets or submit a new inquiry below.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Embedded Submit Support Ticket Form Section ─────────────────── */}
+          <div className="card" style={{ padding: '36px 40px', marginBottom: 32, background: 'var(--bg-surface)', border: '1px solid var(--border-active)', borderRadius: 20, boxShadow: 'var(--shadow-md)' }}>
+            
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24, paddingBottom: 18, borderBottom: '1px solid var(--border)' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <MessageSquare size={22} color="#10b981" />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                  {submittedTicket ? 'Ticket Submitted Successfully' : 'Submit a Support Ticket'}
+                </h3>
+                <div style={{ fontSize: '0.86rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                  {submittedTicket ? 'Your support ticket has been registered with our AI engine.' : 'Need help or encountering a system issue? Fill in your query details below.'}
                 </div>
-              ) : (
+              </div>
+            </div>
+
+            {/* Thank You & Ticket Code Confirmation Container */}
+            {submittedTicket ? (
+              <div style={{ padding: '32px 24px', borderRadius: 14, background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', textAlign: 'center' }}>
+                <CheckCircle2 size={56} color="#10b981" style={{ margin: '0 auto 16px' }} />
+                <h3 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8 }}>
+                  Thank you! Your ticket has been submitted.
+                </h3>
+                <p style={{ fontSize: '0.94rem', color: 'var(--text-secondary)', marginBottom: 20 }}>
+                  Your ticket has been analyzed by our AI Prioritization Engine. Here is your unique Ticket ID:
+                </p>
+
+                {/* Displayed Ticket Code Box */}
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 14,
+                  padding: '14px 28px', borderRadius: 12,
+                  background: 'var(--bg-input)', border: '1px solid rgba(16, 185, 129, 0.4)',
+                  marginBottom: 26
+                }}>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981', fontFamily: 'monospace', letterSpacing: '0.08em' }}>
+                    {submittedTicket.code}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => copyToClipboard(submittedTicket.code)}
+                    style={{ color: '#2563eb' }}
+                  >
+                    <Copy size={16} /> {copied ? 'Copied!' : 'Copy ID'}
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 14, flexWrap: 'wrap' }}>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => navigate(`/track?id=${submittedTicket.code}`)}
+                    style={{ padding: '12px 26px', fontWeight: 700, background: 'linear-gradient(135deg, #10b981, #059669)' }}
+                  >
+                    <ExternalLink size={16} /> Track Ticket Status
+                  </button>
+
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => navigate('/tickets')}
+                    style={{ padding: '12px 26px' }}
+                  >
+                    View My Tickets Queue
+                  </button>
+
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => setSubmittedTicket(null)}
+                    style={{ padding: '12px 20px' }}
+                  >
+                    Submit Another Query
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {errorMsg && (
+                  <div style={{ padding: '14px 18px', borderRadius: 10, fontSize: '0.88rem', marginBottom: 20, background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.35)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <AlertCircle size={18} /> <span>{errorMsg}</span>
+                  </div>
+                )}
+
+                {/* Form */}
                 <form onSubmit={handleSubmit}>
-                  {errorMsg && (
-                    <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: '#ef4444', marginBottom: 20, fontSize: '0.88rem' }}>
-                      {errorMsg}
-                    </div>
-                  )}
-
+                  {/* Subject Field */}
                   <div style={{ marginBottom: 20 }}>
-                    <label style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, display: 'block' }}>
-                      Ticket Subject *
-                    </label>
+                    <label className="modal-field-label">Ticket Subject *</label>
                     <input
+                      id="ticket-subject-input"
                       type="text"
                       className="modal-input"
-                      placeholder="Brief summary of the issue..."
+                      placeholder="Brief summary of your technical issue or question..."
                       value={subject}
                       onChange={e => setSubject(e.target.value)}
                       required
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-                    <div>
-                      <label style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, display: 'block' }}>
-                        Category
-                      </label>
-                      <select
-                        className="modal-input"
-                        value={category}
-                        onChange={e => setCategory(e.target.value)}
-                      >
-                        <option>Database & Infrastructure</option>
-                        <option>Web & UI/UX</option>
-                        <option>Billing & Integrations</option>
-                        <option>API & Security</option>
-                        <option>Technical Support</option>
-                      </select>
+                  {/* Detailed Description */}
+                  <div style={{ marginBottom: 22 }}>
+                    <label className="modal-field-label">Detailed Description *</label>
+                    
+                    {/* Formatting Toolbar */}
+                    <div style={{
+                      display: 'flex', gap: 6, padding: '8px 12px',
+                      background: 'var(--bg-input)',
+                      borderRadius: '10px 10px 0 0',
+                      border: '1px solid var(--border)',
+                      borderBottom: 'none'
+                    }}>
+                      <button type="button" className="icon-btn" style={{ width: 30, height: 30 }} title="Bold" onClick={() => insertFormatting('**', '**')}>
+                        <Bold size={14} />
+                      </button>
+                      <button type="button" className="icon-btn" style={{ width: 30, height: 30 }} title="Italic" onClick={() => insertFormatting('*', '*')}>
+                        <Italic size={14} />
+                      </button>
+                      <button type="button" className="icon-btn" style={{ width: 30, height: 30 }} title="Bulleted List" onClick={() => insertFormatting('- ')}>
+                        <List size={14} />
+                      </button>
+                      <button type="button" className="icon-btn" style={{ width: 30, height: 30 }} title="Insert Link" onClick={() => insertFormatting('[', '](https://)')}>
+                        <Link2 size={14} />
+                      </button>
+                      <button type="button" className="icon-btn" style={{ width: 30, height: 30 }} title="Mention User" onClick={() => insertFormatting('@')}>
+                        <AtSign size={14} />
+                      </button>
                     </div>
 
-                    <div>
-                      <label style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, display: 'block' }}>
-                        Your Contact Email *
-                      </label>
-                      <input
-                        type="email"
-                        className="modal-input"
-                        value={contactEmail}
-                        onChange={e => setContactEmail(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ marginBottom: 20 }}>
-                    <label style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, display: 'block' }}>
-                      Detailed Description *
-                    </label>
-                    <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: 'var(--bg-input)', borderRadius: '10px 10px 0 0', border: '1px solid var(--border)', borderBottom: 'none' }}>
-                      <button type="button" className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => insertFormatting('**', '**')}><Bold size={13} /></button>
-                      <button type="button" className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => insertFormatting('*', '*')}><Italic size={13} /></button>
-                      <button type="button" className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => insertFormatting('- ')}><List size={13} /></button>
-                      <button type="button" className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => insertFormatting('[', '](https://)')}><Link2 size={13} /></button>
-                    </div>
                     <textarea
                       ref={textareaRef}
+                      id="ticket-desc-input"
                       className="modal-input"
-                      style={{ borderRadius: '0 0 10px 10px', minHeight: 130, padding: 14, resize: 'vertical' }}
-                      placeholder="Please provide full error codes, steps to reproduce, or specific questions..."
+                      style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, minHeight: 140, padding: 14, resize: 'vertical' }}
+                      placeholder="Describe your issue, error codes, steps to reproduce, or requirements in detail..."
                       value={description}
                       onChange={e => setDescription(e.target.value)}
                       required
                     />
                   </div>
 
+                  {/* File Upload Zone */}
                   <div style={{ marginBottom: 24 }}>
-                    <label style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, display: 'block' }}>
-                      Attachments (Logs, Screenshots)
-                    </label>
+                    <label className="modal-field-label">File Attachments</label>
                     <div
                       onDrop={handleDrop}
                       onDragOver={e => { e.preventDefault(); setDragOver(true) }}
                       onDragLeave={() => setDragOver(false)}
-                      onClick={() => document.getElementById('file-input-helpdesk').click()}
+                      onClick={() => document.getElementById('file-input-homepage').click()}
                       style={{
-                        border: `2px dashed ${dragOver ? '#6366f1' : 'var(--border)'}`,
-                        borderRadius: 12, padding: '20px', textAlign: 'center', cursor: 'pointer',
-                        background: dragOver ? 'rgba(99,102,241,0.08)' : 'var(--bg-input)',
-                      }}
-                    >
-                      <Upload size={22} color="#64748b" style={{ margin: '0 auto 6px' }} />
-                      <div style={{ fontSize: '0.86rem', color: 'var(--text-muted)' }}>Click to upload or drag & drop files here</div>
-                      <input id="file-input-helpdesk" type="file" multiple hidden onChange={e => setFiles(f => [...f, ...Array.from(e.target.files)])} />
+                        border: `2px dashed ${dragOver ? '#3b82f6' : 'var(--border)'}`,
+                        borderRadius: 12,
+                        padding: '24px 20px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        background: dragOver ? 'var(--accent-dim)' : 'var(--bg-input)',
+                        transition: 'all 0.2s ease',
+                      }}>
+                      <Upload size={24} color="#64748b" style={{ margin: '0 auto 8px' }} />
+                      <div style={{ fontSize: '0.88rem', fontWeight: 500, color: '#cbd5e1', marginBottom: 2 }}>Click to upload or drag and drop</div>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Logs, screenshots, or stack trace files (Max 25MB)</div>
+                      <input id="file-input-homepage" type="file" multiple hidden onChange={e => setFiles(f => [...f, ...Array.from(e.target.files)])} />
                     </div>
                     {files.length > 0 && (
-                      <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {files.map((f, i) => (
                           <span key={i} className="chip">
-                            {f.name} <X size={12} style={{ cursor: 'pointer', marginLeft: 4 }} onClick={() => setFiles(fs => fs.filter((_, j) => j !== i))} />
+                            {f.name}
+                            <X size={12} style={{ cursor: 'pointer', marginLeft: 4 }} onClick={() => setFiles(fs => fs.filter((_, j) => j !== i))} />
                           </span>
                         ))}
                       </div>
                     )}
                   </div>
 
+                  {/* Duplicate Ticket Warning */}
                   {duplicateWarning && (
-                    <div style={{ padding: '14px 18px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 10, marginBottom: 20 }}>
-                      <div style={{ fontSize: '0.86rem', color: '#fbbf24', fontWeight: 700, marginBottom: 4 }}>Possible Duplicate Detected</div>
-                      <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Similar open ticket found: {duplicateWarning.subject}</div>
-                      <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                        <button type="button" className="btn btn-secondary btn-sm" onClick={(e) => handleSubmit(e, true)}>Submit Anyway</button>
+                    <div style={{ marginBottom: 16, padding: '14px 18px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <AlertCircle size={18} color="#f59e0b" style={{ flexShrink: 0, marginTop: 1 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#fbbf24', marginBottom: 3 }}>Possible Duplicate Ticket Detected</div>
+                          <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                            You already have a similar open ticket: <strong style={{ color: '#f1f5f9' }}>{duplicateWarning.subject}</strong>
+                          </div>
+                          <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate(`/tickets/${duplicateWarning.id}`)} style={{ padding: '5px 12px' }}>
+                              View Existing Ticket
+                            </button>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={(e) => handleSubmit(e, true)} style={{ padding: '5px 12px' }}>
+                              Submit Anyway
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                    <button type="button" className="btn btn-ghost" onClick={() => setActiveTab('home')}>Cancel</button>
-                    <button type="submit" className="action-btn-primary" style={{ width: 'auto', padding: '12px 32px' }} disabled={submitting}>
-                      {submitting ? 'Creating Ticket...' : 'Submit Ticket'}
+                  {/* Submit Button */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 10 }}>
+                    <button
+                      type="submit"
+                      className="query-btn"
+                      disabled={submitting}
+                      style={{ padding: '14px 36px', fontSize: '1rem', fontWeight: 700, background: 'linear-gradient(135deg, #10b981, #059669)', display: 'flex', alignItems: 'center', gap: 8 }}
+                    >
+                      <Send size={18} /> {submitting ? 'Analyzing & Submitting…' : 'Submit Ticket'}
                     </button>
                   </div>
                 </form>
-              )}
-            </div>
-          )}
+              </>
+            )}
+          </div>
 
-          {/* ── Active Tab View: Check Ticket Status Search ─────────────────── */}
-          {activeTab === 'status-check' && (
-            <div className="card" style={{ padding: '36px 40px', borderRadius: 20, marginBottom: 32 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <RefreshCw size={22} color="#10b981" />
-                  <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                    Check Ticket Status
-                  </h2>
+          {/* ── Enterprise Support Platform Overview ─────────────────── */}
+          <div className="card" style={{ padding: '32px 36px', borderRadius: 20, background: 'var(--bg-surface)', border: '1px solid var(--border-active)', marginBottom: 32 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, alignItems: 'center' }}>
+              <div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#2563eb', fontSize: '0.8rem', fontWeight: 700, marginBottom: 14 }}>
+                  <ShieldCheck size={14} /> ENTERPRISE SUPPORT PLATFORM
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={() => setActiveTab('home')}>Close</button>
+                <h3 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.3, marginBottom: 12 }}>
+                  About TicketFlow AI Support Portal
+                </h3>
+                <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', lineHeight: 1.65, marginBottom: 20 }}>
+                  TicketFlow AI is a central resolution hub engineered for seamless technical support management, connecting users with dedicated specialists to resolve inquiries promptly and efficiently.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(59, 130, 246, 0.12)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.82rem', flexShrink: 0 }}>✓</div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Unified Customer Support Workspace</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Submit technical tickets, attach log files, and manage all your inquiries from a single organized dashboard.</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.82rem', flexShrink: 0 }}>✓</div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Dedicated Specialist Assistance</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Your requests are directed to qualified domain specialists for comprehensive technical analysis and resolution.</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.82rem', flexShrink: 0 }}>✓</div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Real-Time Status & Audit History</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Track progress, view activity timelines, and receive updates directly through your personal ticket portal.</div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 24 }}>
-                Enter your unique ticket number (e.g. <strong>TK-8842</strong>) to track real-time resolution progress and responses.
-              </p>
-
-              <form onSubmit={handleTrackSearch} style={{ display: 'flex', gap: 12, maxWidth: 540 }}>
-                <input
-                  type="text"
-                  className="modal-input"
-                  placeholder="Enter Ticket ID (e.g. TK-8842)..."
-                  value={searchCode}
-                  onChange={e => setSearchCode(e.target.value)}
-                  style={{ flex: 1 }}
-                  required
-                />
-                <button type="submit" className="action-btn-primary" style={{ width: 'auto', padding: '11px 24px', background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-                  <Search size={16} /> Track Status
-                </button>
-              </form>
-
-              <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--border)', display: 'flex', gap: 16 }}>
-                <button className="btn btn-secondary" onClick={() => navigate('/tickets')}>
-                  View All My Submitted Tickets
-                </button>
+              <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)' }}>
+                <img src="/ticket_workflow_3d.jpg" alt="TicketFlow Platform Workspace" style={{ width: '100%', height: 310, objectFit: 'cover', display: 'block' }} />
+                <div style={{ position: 'absolute', bottom: 12, left: 12, right: 12, padding: '10px 16px', borderRadius: 10, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(12px)', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 600 }}>
+                  <span>🛡️ TicketFlow Enterprise Support Workspace</span>
+                  <span style={{ color: '#34d399' }}>● 24/7 Availability</span>
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* ── Bottom Helpdesk Footer Bar ──────────────────────────────────── */}
-          <div className="helpdesk-footer-bar">
-            <div style={{ marginBottom: 8, fontWeight: 600 }}>
-              TicketFlow.ai : Support Helpdesk @ 2026
-            </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              Dedicated Incident Resolution & SLA Management System
             </div>
           </div>
+
+
 
         </div>
       </div>
