@@ -59,6 +59,20 @@ function withUser(Component, user) {
   return <Component user={activeUser} />
 }
 
+function getDefaultPortalRoute() {
+  const portalEnv = import.meta.env.VITE_PORTAL_TYPE || ''
+  if (portalEnv === 'admin') return '/admin-login'
+  if (portalEnv === 'agent') return '/agent-login'
+  if (portalEnv === 'customer') return '/login'
+  // Automatic hostname detection fallback
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname.toLowerCase()
+    if (host.includes('agent')) return '/agent-login'
+    if (host.includes('admin')) return '/admin-login'
+  }
+  return '/login'
+}
+
 export default function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
