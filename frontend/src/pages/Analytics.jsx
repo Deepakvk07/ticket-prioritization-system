@@ -213,6 +213,52 @@ export default function Analytics({ user }) {
               ))}
             </div>
           </div>
+
+          {/* Charts Row 3 — CSAT Trend & Resolution Histogram */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
+            {/* CSAT Trend Graph */}
+            <div className="card">
+              <div className="section-title" style={{ marginBottom: 14 }}>
+                ⭐ CSAT Satisfaction Score Trend (Last 4 Weeks)
+              </div>
+              <ResponsiveContainer width="100%" height={160}>
+                <LineChart data={[
+                  { week: 'W1', csat: 4.5 },
+                  { week: 'W2', csat: 4.6 },
+                  { week: 'W3', csat: 4.7 },
+                  { week: 'W4', csat: 4.85 },
+                ]}>
+                  <CartesianGrid stroke="rgba(255,255,255,0.04)" vertical={false} />
+                  <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
+                  <YAxis domain={[4.0, 5.0]} hide />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line type="monotone" dataKey="csat" name="CSAT Rating" stroke="#f59e0b"
+                    strokeWidth={3} dot={{ fill: '#f59e0b', strokeWidth: 0, r: 5 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Resolution Time Histogram */}
+            <div className="card">
+              <div className="section-title" style={{ marginBottom: 14 }}>
+                ⏱️ Resolution Time Histogram (Minutes)
+              </div>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={[
+                  { range: '< 15m', count: 420 },
+                  { range: '15-60m', count: 860 },
+                  { range: '1-3h', count: 640 },
+                  { range: '3-6h', count: 310 },
+                  { range: '> 6h', count: 180 },
+                ]}>
+                  <XAxis dataKey="range" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
+                  <YAxis hide />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="count" name="Tickets" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       </div>
     </div>

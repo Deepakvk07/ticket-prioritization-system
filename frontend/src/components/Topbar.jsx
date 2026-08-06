@@ -167,6 +167,27 @@ export default function Topbar({ user, placeholder = 'Search tickets, agents, or
           />
         </div>
 
+        {/* Language Selector Dropdown */}
+        <select
+          className="form-select"
+          value={localStorage.getItem('tf_lang') || 'en'}
+          onChange={e => {
+            localStorage.setItem('tf_lang', e.target.value)
+            window.dispatchEvent(new Event('languageChange'))
+          }}
+          style={{
+            fontSize: '0.78rem', padding: '4px 8px', borderRadius: 8,
+            border: '1px solid var(--border)', background: 'var(--bg-input)',
+            color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer'
+          }}
+        >
+          <option value="en">🇺🇸 EN</option>
+          <option value="es">🇪🇸 ES</option>
+          <option value="fr">🇫🇷 FR</option>
+          <option value="de">🇩🇪 DE</option>
+          <option value="hi">🇮🇳 HI</option>
+        </select>
+
         {/* Dark/Light Mode Toggle */}
         <button
           className="icon-btn"

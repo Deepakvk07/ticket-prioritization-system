@@ -165,16 +165,31 @@ export default function FAQ({ user }) {
             <div style={{ fontSize: '2.2rem', marginBottom: 10 }}>📚</div>
             <h1 className="faq-hero" style={{ fontSize: '2.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, background: 'none', border: 'none', padding: 0 }}>Knowledge Base &amp; FAQ</h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Find answers to common questions or submit a ticket if you need further help.</p>
-            <div className="faq-search">
-              <Search size={18} color="var(--text-muted)" />
-              <input
-                placeholder="Search questions..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                style={{ color: 'var(--text-primary)' }}
-              />
+              <div className="faq-search">
+                <Search size={18} color="var(--text-muted)" />
+                <input
+                  placeholder="Ask AI or search knowledge base (e.g. 'How to track ticket', '504 error')..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  style={{ color: 'var(--text-primary)' }}
+                />
+              </div>
             </div>
-          </div>
+
+            {/* AI Instant Answer Banner */}
+            {searchQuery.trim().length > 2 && (
+              <div className="card" style={{ padding: '20px 24px', marginBottom: 24, borderRadius: 16, background: 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(16,185,129,0.06))', border: '1px solid rgba(37,99,235,0.25)' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  ⚡ AI Instant Answer Prediction
+                </div>
+                <div style={{ fontSize: '0.92rem', color: 'var(--text-primary)', fontWeight: 600, lineHeight: 1.5, marginBottom: 8 }}>
+                  "{searchQuery}"
+                </div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  {filteredData[0]?.questions[0]?.a || 'TicketFlow AI Assistant: Check out our top knowledge base matches below or submit a ticket directly for personal agent support.'}
+                </div>
+              </div>
+            )}
 
           {/* Category Tabs */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
