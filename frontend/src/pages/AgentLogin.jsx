@@ -65,7 +65,7 @@ export default function AgentLogin() {
         try {
           const existingRaw = localStorage.getItem('registered_agents')
           const existing = existingRaw ? JSON.parse(existingRaw) : []
-          const filtered = Array.isArray(existing) ? existing.filter(a => a.email.toLowerCase() !== email.trim().toLowerCase()) : []
+          const filtered = Array.isArray(existing) ? existing.filter(a => a && typeof a === 'object' && a.email && typeof a.email === 'string' && a.email.toLowerCase() !== email.trim().toLowerCase()) : []
           filtered.push(newAgentObj)
           localStorage.setItem('registered_agents', JSON.stringify(filtered))
         } catch (e) {
