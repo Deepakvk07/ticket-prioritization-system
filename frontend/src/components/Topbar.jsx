@@ -104,11 +104,43 @@ export default function Topbar({ user, placeholder }) {
   }
 
   return (
-    <header className="topbar" style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '0 24px', height: 62, background: 'var(--bg-surface)',
-      borderBottom: '1px solid var(--border)', sticky: 'top', zIndex: 1000
-    }}>
+    <>
+      {/* Official Government Public Grievance Top Bar */}
+      <div style={{
+        background: '#0b1329',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        padding: '5px 24px',
+        fontSize: '0.72rem',
+        color: '#94a3b8',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 10
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 600 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#f97316', fontWeight: 800 }}>
+            🇮🇳 भारत सरकार | Govt of India
+          </span>
+          <span>•</span>
+          <span style={{ color: '#e2e8f0' }}>National Public Grievance & Technical Redressal Portal</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: '0.7rem' }}>
+          <span>📞 Toll-Free Helpline: <strong>1800-111-7788</strong></span>
+          <span>🔒 MeitY Security Certified</span>
+          <span style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', padding: '1px 8px', borderRadius: 4, fontWeight: 700 }}>
+            Citizen Charter SLA
+          </span>
+        </div>
+      </div>
+      {/* Tricolor Accent Strip */}
+      <div style={{ height: 3, background: 'linear-gradient(90deg, #f97316 33%, #ffffff 33% 66%, #10b981 66%)' }} />
+
+      <header className="topbar" style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 24px', height: 62, background: 'var(--bg-surface)',
+        borderBottom: '1px solid var(--border)', sticky: 'top', zIndex: 1000
+      }}>
       {/* Brand & Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
         <div onClick={() => navigate('/home')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
@@ -333,5 +365,6 @@ export default function Topbar({ user, placeholder }) {
         </div>
       )}
     </header>
+    </>
   )
 }
