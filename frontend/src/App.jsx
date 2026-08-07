@@ -22,9 +22,11 @@ import ModelManagement from './pages/ModelManagement'
 import Settings from './pages/Settings'
 import TrackTicket from './pages/TrackTicket'
 import FAQ from './pages/FAQ'
-import Profile from './pages/Profile'
-import TicketHistory from './pages/TicketHistory'
 import SpecialistAgents from './pages/SpecialistAgents'
+import SecurityTelemetry from './pages/SecurityTelemetry'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
+import TrustCenter from './pages/TrustCenter'
 
 function getSafeDemoUser() {
   try {
@@ -157,6 +159,19 @@ export default function App() {
         } />
         <Route path="/profile" element={
           <AuthGate user={user} loading={loading}>{withUser(Profile, user)}</AuthGate>
+        } />
+        {/* Trust & Compliance Pages */}
+        <Route path="/security-telemetry" element={
+          <AuthGate user={user} loading={loading}>{withUser(SecurityTelemetry, user)}</AuthGate>
+        } />
+        <Route path="/privacy-policy" element={
+          <AuthGate user={user} loading={loading}>{withUser(PrivacyPolicy, user)}</AuthGate>
+        } />
+        <Route path="/terms-of-service" element={
+          <AuthGate user={user} loading={loading}>{withUser(TermsOfService, user)}</AuthGate>
+        } />
+        <Route path="/trust-center" element={
+          <AuthGate user={user} loading={loading}>{withUser(TrustCenter, user)}</AuthGate>
         } />
         {/* Direct Portal Shortcuts */}
         <Route path="/admin" element={<AdminLogin />} />

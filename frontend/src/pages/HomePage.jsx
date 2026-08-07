@@ -613,76 +613,67 @@ export default function HomePage({ user }) {
             fontSize: '0.82rem',
             lineHeight: 1.6
           }}>
-            {/* Trust & Accolades Badges */}
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              flexWrap: 'wrap', gap: 16, marginBottom: 28,
-              padding: '16px 24px', borderRadius: 14,
-              background: 'var(--bg-card)', border: '1px solid var(--border)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 700, color: 'var(--text-primary)' }}>
-                <ShieldCheck size={18} color="#10b981" />
-                <span>Enterprise Security & Compliance Certified</span>
-              </div>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: '0.74rem', fontWeight: 600 }}>
-                <span className="chip">🔒 SOC 2 Type II</span>
-                <span className="chip">🛡️ ISO 27001</span>
-                <span className="chip">⚡ GDPR Compliant</span>
-                <span className="chip">🏥 HIPAA Ready</span>
-                <span className="chip">🌐 99.99% SLA Uptime</span>
-              </div>
-            </div>
-
             {/* Corporate Links Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24, marginBottom: 30 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 30, marginBottom: 30 }}>
               <div>
-                <div style={{ fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, fontSize: '0.9rem' }}>
+                <div style={{ fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, fontSize: '0.95rem' }}>
                   TicketFlow AI™
                 </div>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
                   Next-generation autonomous ticket resolution hub and priority triage platform.
                 </p>
               </div>
 
               <div>
-                <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8, fontSize: '0.82rem' }}>
+                <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12, fontSize: '0.88rem' }}>
                   Trust & Compliance
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.76rem' }}>
-                  <span>Security Telemetry</span>
-                  <span>Privacy Policy</span>
-                  <span>Terms of Service</span>
-                  <span>Trust Center</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.82rem' }}>
+                  <button
+                    onClick={() => navigate('/security-telemetry')}
+                    style={{ background: 'none', border: 'none', color: '#3b82f6', textAlign: 'left', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                  >
+                    → Security Telemetry
+                  </button>
+                  <button
+                    onClick={() => navigate('/privacy-policy')}
+                    style={{ background: 'none', border: 'none', color: '#3b82f6', textAlign: 'left', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                  >
+                    → Privacy Policy
+                  </button>
+                  <button
+                    onClick={() => navigate('/terms-of-service')}
+                    style={{ background: 'none', border: 'none', color: '#3b82f6', textAlign: 'left', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                  >
+                    → Terms of Service
+                  </button>
+                  <button
+                    onClick={() => navigate('/trust-center')}
+                    style={{ background: 'none', border: 'none', color: '#3b82f6', textAlign: 'left', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                  >
+                    → Trust Center
+                  </button>
                 </div>
               </div>
 
               <div>
-                <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8, fontSize: '0.82rem' }}>
-                  Global Headquarters
+                <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12, fontSize: '0.88rem' }}>
+                  System Health & Uptime
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.76rem' }}>
-                  <span>San Francisco, CA</span>
-                  <span>London, UK</span>
-                  <span>Bengaluru, India</span>
-                  <span>Tokyo, Japan</span>
-                </div>
-              </div>
-
-              <div>
-                <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8, fontSize: '0.82rem' }}>
-                  System Health
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: '#10b981', fontWeight: 700 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.84rem', color: '#10b981', fontWeight: 700, marginBottom: 8 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 8px #10b981' }} />
                   All Systems Operational
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Continuous database replication & API gateway monitoring active.
                 </div>
               </div>
             </div>
 
-            {/* Copyright & Trademark Statement */}
+            {/* Copyright Statement */}
             <div style={{
               textAlign: 'center', paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.06)',
-              fontSize: '0.76rem', color: 'var(--text-muted)'
+              fontSize: '0.78rem', color: 'var(--text-muted)'
             }}>
               © 2026 TicketFlow AI Technologies Inc. All Rights Reserved. ® | TicketFlow™, OmniSupport™, and AI Triage Engine™ are registered trademarks.
             </div>
