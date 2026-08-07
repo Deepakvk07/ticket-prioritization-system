@@ -634,8 +634,8 @@ export default function TicketDetail({ user }) {
               </div>
             )}
 
-            {/* Rating Card — show after resolved/closed */}
-            {(t.status === 'Resolved' || t.status === 'Closed') && (
+            {/* Rating Card — show after resolved/closed ONLY to Customers (not Agents/Admins) */}
+            {!isStaff && (t.status === 'Resolved' || t.status === 'Closed') && (
               <div className="card" style={{ padding: 24, marginTop: 20, textAlign: 'center', background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(59,130,246,0.06))', border: '1px solid rgba(16,185,129,0.2)' }}>
                 {ratingSubmitted ? (
                   <div>
