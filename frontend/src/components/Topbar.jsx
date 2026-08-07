@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Bell, HelpCircle, Sun, Moon, X, Ticket, CheckCircle2, AlertCircle, LayoutDashboard, Headphones, BarChart2, Cpu, Home, LogOut, Zap } from 'lucide-react'
+import { Search, Bell, HelpCircle, Sun, Moon, X, Ticket, CheckCircle2, AlertCircle, LayoutDashboard, Headphones, BarChart2, Cpu, Home, LogOut, Zap, Menu } from 'lucide-react'
 import { useNavigate, useLocation, NavLink } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useTranslation } from '../lib/i18n'
@@ -15,6 +15,7 @@ export default function Topbar({ user, placeholder }) {
   const { t, lang } = useTranslation()
   const [query, setQuery] = useState('')
   const [showNotifs, setShowNotifs] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notifications, setNotifications] = useState(getNotifications())
   const [isDark, setIsDark] = useState(() => localStorage.getItem('tf_theme') === 'dark')
   const navigate = useNavigate()
@@ -129,8 +130,8 @@ export default function Topbar({ user, placeholder }) {
           </div>
         </div>
 
-        {/* Horizontal Navigation Tabs */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 10 }}>
+        {/* Horizontal Navigation Tabs (Desktop) */}
+        <nav className="topbar-desktop-nav" style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 10 }}>
           {navItems.map(item => {
             const Icon = item.icon
             const isActive = location.pathname === item.to
@@ -158,6 +159,14 @@ export default function Topbar({ user, placeholder }) {
 
       {/* Right Controls */}
       <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        {/* Mobile Hamburger Toggle Button */}
+        <button
+          className="topbar-mobile-toggle icon-btn"
+          title="Toggle Navigation Menu"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        >
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
         {/* If Customer Panel: Show Language Switch Button instead of Search Bar */}
         {activeRole === 'customer' ? (
           <button
@@ -295,6 +304,34 @@ export default function Topbar({ user, placeholder }) {
           </button>
         </div>
       </div>
+
+      {/* Mobile Slide-down Navigation Drawer */}
+      {mobileMenuOpen && (
+        <div className="mobile-nav-drawer animate-fade">
+          {navItems.map(item => {
+            const Icon = item.icon
+            const isActive = location.pathname === item.to
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 16px', borderRadius: 10, fontSize: '0.92rem',
+                  fontWeight: isActive ? 700 : 600,
+                  color: isActive ? 'var(--accent)' : 'var(--text-primary)',
+                  background: isActive ? 'var(--accent-dim)' : 'var(--bg-input)',
+                  border: isActive ? '1px solid rgba(37,99,235,0.3)' : '1px solid var(--border)'
+                }}
+              >
+                <Icon size={18} />
+                <span>{item.label}</span>
+              </NavLink>
+            )
+          })}
+        </div>
+      )}
     </header>
   )
 }
