@@ -2,7 +2,6 @@
 Analytics router — aggregated stats for the Analytics page.
 """
 from fastapi import APIRouter
-from datetime import datetime, timedelta, timezone
 from app.core.config import get_settings
 from supabase import create_client
 

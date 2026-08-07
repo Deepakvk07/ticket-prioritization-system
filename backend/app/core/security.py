@@ -5,9 +5,8 @@ import hmac
 import hashlib
 import os
 from typing import Optional
-from fastapi import Security, HTTPException, status, Header, Request
+from fastapi import Security, HTTPException, status, Header
 from fastapi.security.api_key import APIKeyHeader
-from app.core.config import get_settings
 
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 

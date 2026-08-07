@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import uuid
 
 from app.schemas.ticket import (
-    TicketCreate, TicketUpdate, TicketResponse,
+    TicketCreate, TicketUpdate,
     PredictRequest, PredictResponse, TicketActivity
 )
 from app.services.ml_service import predict_priority
@@ -159,7 +159,7 @@ async def create_ticket(body: TicketCreate, background_tasks: BackgroundTasks):
             t = resp.data[0]
             t["code"] = ticket_code
             return t
-    except Exception as e:
+    except Exception:
         ticket_data["code"] = ticket_code
         return ticket_data
 

@@ -2,14 +2,13 @@
 Enterprise REST API Router — Plug-and-Play AI Service Endpoints for External Helpdesks.
 Supports ServiceNow, Jira Service Management, Zendesk, Freshdesk, and Custom REST APIs.
 """
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 import uuid
-import os
 
 from app.core.security import verify_api_key
-from app.integrations import get_adapter, ADAPTER_REGISTRY
+from app.integrations import get_adapter
 from app.services.ml_service import predict_priority
 from app.services.webhook_service import dispatch_outbound_webhook
 

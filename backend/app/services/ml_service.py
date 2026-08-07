@@ -1,7 +1,6 @@
 """
 ML Service — loads trained model and provides prediction interface.
 """
-import os
 import re
 import joblib
 import numpy as np
@@ -35,7 +34,6 @@ def _load_artifacts():
 
 
 def get_model():
-    global _model, _vectorizer, _label_encoder
     if _model is None:
         _load_artifacts()
     return _model, _vectorizer, _label_encoder

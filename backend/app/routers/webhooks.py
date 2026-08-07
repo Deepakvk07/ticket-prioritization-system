@@ -2,12 +2,10 @@
 Webhooks Receiver Router — Inbound Webhook Handlers for ServiceNow, Jira, Zendesk, and Freshdesk.
 Automatically normalizes incoming ticket webhooks, triggers AI triage, and responds with priority payload updates.
 """
-from fastapi import APIRouter, Request, Header, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, Request, Header, HTTPException
 from typing import Dict, Any, Optional
 from app.integrations import get_adapter
 from app.services.ml_service import predict_priority
-from app.services.webhook_service import dispatch_outbound_webhook
-from app.core.security import verify_webhook_signature
 
 
 router = APIRouter(prefix="/api/v1/webhooks", tags=["Enterprise Webhooks"])
@@ -25,7 +23,6 @@ async def handle_servicenow_webhook(
     Classifies priority and returns ServiceNow update JSON payload.
     """
     try:
-        raw_body = await request.body()
         payload = await request.json()
 
         adapter = get_adapter("servicenow")

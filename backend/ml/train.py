@@ -1,29 +1,12 @@
 """
-OmniSupport AI — ML Training Pipeline (Hybrid)
-================================================
-Strategy:
-  The customer_support_tickets.csv contains 8,469 real-world tickets
-  but with randomly-distributed priority labels (no text→priority signal).
-  
-  We use a HYBRID approach:
-  1. Extract real-world vocabulary, ticket types, products, and patterns from CSV
-  2. Generate priority-aware training data that maps realistic text to correct priorities
-  3. Combine both to produce a model that understands real-world language AND priority signals
-
-Pipeline:
-  1. Analyze CSV for domain vocabulary, products, ticket types, and patterns
-  2. Generate enriched synthetic dataset using real CSV patterns + clear priority signals
-  3. TF-IDF vectorization (unigrams + bigrams, max 20K features)
-  4. Calibrated LinearSVC with balanced class weights + 5-fold CV
-  5. Evaluate: accuracy, F1-macro, per-class report, confusion matrix
-  6. Save model.pkl, vectorizer.pkl, label_encoder.pkl
-
-Run:
-  cd backend
-  python ml/train.py
+================================================================================
+STUDENT CAPSTONE PROJECT — Machine Learning Model Training Script
+Project Title : Ticket Prioritization System
+Model Type    : TF-IDF Vectorizer + Calibrated Linear Support Vector Machine (SVC)
+Output Files  : model.pkl, vectorizer.pkl, label_encoder.pkl
+================================================================================
 """
 
-import os
 import re
 import json
 import time
@@ -452,9 +435,9 @@ if __name__ == "__main__":
     accuracy, f1 = train(df)
 
     print("\n" + "=" * 60)
-    print(f"  [+] Hybrid training complete!")
+    print("  [+] Hybrid training complete!")
     print(f"  CSV patterns from: {CSV_PATH.name} (8,469 tickets)")
     print(f"  Training samples: {len(df)} enriched tickets")
     print(f"  Accuracy: {accuracy*100:.2f}%  |  F1-Macro: {f1:.4f}")
-    print(f"  Model saved -> ml/model.pkl")
+    print("  Model saved -> ml/model.pkl")
     print("=" * 60)

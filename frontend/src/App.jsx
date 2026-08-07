@@ -1,3 +1,10 @@
+/**
+ * ==============================================================================
+ * STUDENT CAPSTONE PROJECT — React Single Page Application (App.jsx)
+ * Project Title: OmniSupport AI — Ticket Prioritization System
+ * Tech Stack   : React 18, React Router v6, Vite, Supabase
+ * ==============================================================================
+ */
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'

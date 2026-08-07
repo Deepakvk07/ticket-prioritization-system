@@ -1,8 +1,9 @@
-# OmniSupport AI — Quick Start Script (Windows PowerShell)
+# Student Capstone Project — Automatic Startup Script (Windows PowerShell)
 
 Write-Host ""
 Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host "        OmniSupport AI -- Startup Script          " -ForegroundColor Cyan
+Write-Host "  OmniSupport AI — Ticket Prioritization System  " -ForegroundColor Cyan
+Write-Host "  Student Capstone Project Startup Script        " -ForegroundColor Cyan
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host ""
 

@@ -1,9 +1,9 @@
 """
 Production Token Management Endpoints — Real-time user token verification, redemption, and token status.
 """
-from typing import List, Optional
+from typing import Optional
 from datetime import datetime, timedelta
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.core.config import get_settings
 from supabase import create_client
@@ -58,7 +58,7 @@ async def get_user_tokens(email: str):
             res = client.table("user_tokens").select("*").eq("customer_email", email.strip().lower()).execute()
             if res.data:
                 user_toks = res.data
-        except Exception as e:
+        except Exception:
             user_toks = []
 
     total_credits = sum(t.get("credits_remaining", 0) for t in user_toks if t.get("status") == "ACTIVE")

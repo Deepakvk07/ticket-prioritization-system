@@ -9,7 +9,6 @@ import urllib.parse
 import hmac
 import hashlib
 from typing import Dict, Any, Optional
-from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 """
 Model router — info about the ML model and training logs.
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks
 from pathlib import Path
 import json, subprocess, sys
 from datetime import datetime
