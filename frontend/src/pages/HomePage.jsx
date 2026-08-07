@@ -29,6 +29,7 @@ export default function HomePage({ user }) {
   const [description, setDescription] = useState('')
   const [contactEmail, setContactEmail] = useState(email)
   const [files, setFiles] = useState([])
+  const [dragOver, setDragOver] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const textareaRef = useRef(null)
 
