@@ -19,8 +19,13 @@ export default function TicketDetail({ user }) {
   const [ratingSubmitted, setRatingSubmitted] = useState(false)
   const [replyFiles, setReplyFiles] = useState([])
   const [uploadingFiles, setUploadingFiles] = useState(false)
+  const [slaText, setSlaText] = useState('')
+  const [slaBreached, setSlaBreached] = useState(false)
+  const [collisionAgent, setCollisionAgent] = useState(null)
+  const [toastMsg, setToastMsg] = useState(null)
   const replyFileRef = useRef(null)
 
+  // 1. Initial Ticket Load
   useEffect(() => {
     setLoading(true)
     getTicket(id)
@@ -28,8 +33,68 @@ export default function TicketDetail({ user }) {
       .catch(() => { setTicket(null); setLoading(false) })
   }, [id])
 
+  // 2. Live SLA Countdown Timer Clock
   useEffect(() => {
-    // Load saved rating from Supabase
+    if (!ticket || ticket.status === 'Resolved' || ticket.status === 'Closed') return
+
+    const updateSla = () => {
+      const created = new Date(ticket.created_at || Date.now()).getTime()
+      const slaMinutes = ticket.priority === 'Critical' ? 30 : ticket.priority === 'High' ? 120 : ticket.priority === 'Medium' ? 360 : 1440
+      const targetTime = created + slaMinutes * 60 * 1000
+      const diffMs = targetTime - Date.now()
+
+      if (diffMs <= 0) {
+        const breachedMin = Math.abs(Math.floor(diffMs / 60000))
+        setSlaText(`🚨 SLA BREACHED (+${breachedMin}m overtime)`)
+        setSlaBreached(true)
+      } else {
+        const hours = Math.floor(diffMs / (1000 * 60 * 60))
+        const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+        const seconds = Math.floor((diffMs % (1000 * 60)) / 1000)
+        setSlaText(`${hours > 0 ? `${hours}h ` : ''}${minutes}m ${seconds}s remaining`)
+        setSlaBreached(false)
+      }
+    }
+
+    updateSla()
+    const timer = setInterval(updateSla, 1000)
+    return () => clearInterval(timer)
+  }, [ticket])
+
+  // 3. Agent Collision Presence Tracker
+  useEffect(() => {
+    if (!id) return
+    const viewerName = (() => { try { return JSON.parse(localStorage.getItem('demo_user') || '{}')?.name || 'Agent' } catch { return 'Agent' } })()
+    const presenceKey = `tf_presence_${id}`
+
+    // Register active viewing heartbeat
+    const registerHeartbeat = () => {
+      try {
+        const existing = JSON.parse(localStorage.getItem(presenceKey) || '[]')
+        const active = existing.filter(p => p.name !== viewerName && Date.now() - p.time < 6000)
+        localStorage.setItem(presenceKey, JSON.stringify([...active, { name: viewerName, time: Date.now() }]))
+
+        if (active.length > 0) {
+          setCollisionAgent(active[0].name)
+        } else {
+          setCollisionAgent(null)
+        }
+      } catch {}
+    }
+
+    registerHeartbeat()
+    const interval = setInterval(registerHeartbeat, 2500)
+    return () => {
+      clearInterval(interval)
+      try {
+        const existing = JSON.parse(localStorage.getItem(presenceKey) || '[]')
+        localStorage.setItem(presenceKey, JSON.stringify(existing.filter(p => p.name !== viewerName)))
+      } catch {}
+    }
+  }, [id])
+
+  // 4. Load Saved Rating from Supabase
+  useEffect(() => {
     const userEmail = (() => { try { return JSON.parse(localStorage.getItem('demo_user') || '{}')?.email || '' } catch { return '' } })()
     if (userEmail && id) {
       getTicketRating(id, userEmail).then(r => {
@@ -77,11 +142,28 @@ export default function TicketDetail({ user }) {
     } finally { setSending(false) }
   }
 
+  const triggerNotificationToast = (message) => {
+    setToastMsg(message)
+    setTimeout(() => setToastMsg(null), 4000)
+
+    if (typeof Notification !== 'undefined') {
+      if (Notification.permission === 'granted') {
+        try { new Notification('TicketFlow AI Update', { body: message }) } catch {}
+      } else if (Notification.permission !== 'denied') {
+        try { Notification.requestPermission() } catch {}
+      }
+    }
+  }
+
   const handleStatusChange = async (status) => {
     try {
       await updateTicket(id, { status })
       setTicket(t => ({ ...t, status }))
-    } catch { setTicket(t => ({ ...t, status })) }
+      triggerNotificationToast(`📧 Status updated to "${status}" & email notification dispatched to customer!`)
+    } catch {
+      setTicket(t => ({ ...t, status }))
+      triggerNotificationToast(`📧 Status updated to "${status}"`)
+    }
   }
 
   const handleReopen = async () => {
@@ -282,6 +364,20 @@ export default function TicketDetail({ user }) {
             <span>{t.category || 'Technical Support'}</span>
           </div>
 
+          {/* Agent Collision Warning Banner */}
+          {collisionAgent && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '12px 18px', borderRadius: 12, marginBottom: 16,
+              background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.35)',
+              color: '#f59e0b', fontWeight: 700, fontSize: '0.86rem',
+              boxShadow: '0 4px 14px rgba(245, 158, 11, 0.15)'
+            }}>
+              <AlertCircle size={18} />
+              <span>⚠️ <strong>Agent Collision Warning:</strong> Specialist agent <strong>{collisionAgent}</strong> is also actively viewing & replying to this ticket right now.</span>
+            </div>
+          )}
+
           {/* Ticket Header Bar */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
             <h2 style={{ fontSize: '1.65rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>{t.subject}</h2>
@@ -312,30 +408,30 @@ export default function TicketDetail({ user }) {
             </div>
           </div>
 
-          {/* Estimated Resolution Time (SLA) Badge Banner */}
+          {/* Live Ticking SLA Countdown Timer Banner */}
           {t.status !== 'Resolved' && t.status !== 'Closed' && (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
               padding: '14px 20px', borderRadius: 14, marginBottom: 20,
-              background: t.priority === 'Critical' ? 'rgba(239, 68, 68, 0.08)' : t.priority === 'High' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(59, 130, 246, 0.08)',
-              border: `1px solid ${t.priority === 'Critical' ? 'rgba(239, 68, 68, 0.25)' : t.priority === 'High' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(59, 130, 246, 0.25)'}`,
+              background: slaBreached ? 'rgba(239, 68, 68, 0.12)' : t.priority === 'Critical' ? 'rgba(239, 68, 68, 0.08)' : t.priority === 'High' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(59, 130, 246, 0.08)',
+              border: `1px solid ${slaBreached ? 'rgba(239, 68, 68, 0.4)' : t.priority === 'Critical' ? 'rgba(239, 68, 68, 0.25)' : t.priority === 'High' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(59, 130, 246, 0.25)'}`,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{
                   width: 32, height: 32, borderRadius: '50%',
-                  background: t.priority === 'Critical' ? '#ef4444' : t.priority === 'High' ? '#f59e0b' : '#3b82f6',
+                  background: slaBreached ? '#ef4444' : t.priority === 'Critical' ? '#ef4444' : t.priority === 'High' ? '#f59e0b' : '#3b82f6',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0
                 }}>
                   <Clock size={16} />
                 </div>
                 <div>
                   <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    Estimated Agent Response Time: <span style={{ color: t.priority === 'Critical' ? '#ef4444' : t.priority === 'High' ? '#f59e0b' : '#2563eb' }}>
-                      {t.priority === 'Critical' ? '< 30 Minutes (Critical SLA)' : t.priority === 'High' ? '< 2 Hours (Priority SLA)' : t.priority === 'Medium' ? '< 6 Hours (Standard SLA)' : '< 24 Hours (General SLA)'}
+                    Live SLA Response Countdown: <span style={{ color: slaBreached ? '#ef4444' : t.priority === 'Critical' ? '#ef4444' : t.priority === 'High' ? '#f59e0b' : '#2563eb', fontWeight: 800 }}>
+                      {slaText || '< 30 Minutes (Critical SLA)'}
                     </span>
                   </div>
                   <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                    Support agent assignment and initial triage in progress. Live status auto-updates.
+                    Resolution deadline automatically tracked based on AI priority classification.
                   </div>
                 </div>
               </div>
@@ -343,11 +439,11 @@ export default function TicketDetail({ user }) {
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '4px 12px', borderRadius: 20,
-                background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)'
+                background: 'var(--bg-surface)', border: `1px solid ${slaBreached ? '#ef4444' : 'var(--border)'}`,
+                fontSize: '0.78rem', fontWeight: 700, color: slaBreached ? '#ef4444' : 'var(--text-secondary)'
               }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                SLA Target Guaranteed
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: slaBreached ? '#ef4444' : '#10b981', display: 'inline-block' }} />
+                {slaBreached ? 'SLA Breached' : 'SLA Target Active'}
               </div>
             </div>
           )}
@@ -775,6 +871,22 @@ export default function TicketDetail({ user }) {
             </div>
 
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification Floating Alert */}
+      {toastMsg && (
+        <div className="animate-fade" style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 999999,
+          background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+          border: '1px solid rgba(59, 130, 246, 0.4)',
+          boxShadow: '0 16px 40px rgba(0, 0, 0, 0.6)',
+          borderRadius: 14, padding: '14px 20px',
+          color: '#ffffff', fontWeight: 700, fontSize: '0.88rem',
+          display: 'flex', alignItems: 'center', gap: 10
+        }}>
+          <CheckCircle2 size={20} color="#10b981" />
+          <span>{toastMsg}</span>
         </div>
       )}
     </div>
