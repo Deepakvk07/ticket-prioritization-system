@@ -25,6 +25,26 @@ function saveLocalTickets(tickets) {
   } catch { /* ignore */ }
 }
 
+// ── Instant AI Category Classifier ──────────────────────────────────
+export function classifyTicketCategory(subject = '', description = '') {
+  const text = `${subject} ${description}`.toLowerCase()
+
+  if (/database|sql|postgres|mysql|mongodb|redis|query|server|infra|infrastructure|devops|docker|kubernetes|aws|cloud|hosting|outage|cluster|connection|crash/i.test(text)) {
+    return 'Database & Infrastructure'
+  }
+  if (/ui|ux|frontend|css|html|layout|display|theme|dark mode|responsive|mobile|button|page|screen|alignment|rendering|browser|font|color|design/i.test(text)) {
+    return 'Web & UI/UX'
+  }
+  if (/billing|payment|invoice|subscription|charge|refund|credit card|pricing|stripe|checkout|plan|transaction|cost|receipt/i.test(text)) {
+    return 'Billing & Integrations'
+  }
+  if (/api|security|auth|authentication|token|jwt|oauth|ssl|certificate|cors|endpoint|webhook|vulnerability|encryption|login|password|permission|access/i.test(text)) {
+    return 'API & Security'
+  }
+
+  return 'Technical Support'
+}
+
 // ── Instant AI Priority Classifier ────────────────────────────────
 export function classifyTicketPriority(subject = '', description = '', category = '') {
   const text = `${subject} ${category} ${description}`.toLowerCase()
@@ -158,8 +178,13 @@ export const createTicket = async (data) => {
   const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase()
   const ticketCode = `TK-${randomSuffix}`
 
+  // Instant AI category auto-detection from problem text if category is default or missing
+  const detectedCategory = (data.category && data.category !== 'Technical Support' && data.category !== 'General')
+    ? data.category
+    : classifyTicketCategory(data.subject, data.description)
+
   // Instant AI priority prediction
-  const { priority, confidence_score } = classifyTicketPriority(data.subject, data.description, data.category)
+  const { priority, confidence_score } = classifyTicketPriority(data.subject, data.description, detectedCategory)
 
   const newTicket = {
     id: validUuid,
@@ -167,8 +192,8 @@ export const createTicket = async (data) => {
     code: ticketCode,
     subject: data.subject || 'Untitled Ticket',
     description: data.description || '',
-    category: data.category || 'Technical Support',
-    product_module: data.product_module || data.category || 'Technical Support',
+    category: detectedCategory,
+    product_module: detectedCategory,
     customer_name: data.customer_name || 'Valued Customer',
     customer_email: data.customer_email || 'customer@ticketflow.ai',
     status: 'Open',
