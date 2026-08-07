@@ -618,6 +618,20 @@ export default function TicketDetail({ user }) {
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
+                    style={{ fontSize: '0.75rem', padding: '4px 12px', background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(168,85,247,0.25))', color: '#c084fc', border: '1px solid rgba(168,85,247,0.4)', fontWeight: 800 }}
+                    onClick={() => {
+                      const cat = t.category || 'Technical Support'
+                      const subj = t.subject || 'issue'
+                      const name = t.customer_name || 'Customer'
+                      const draft = `Hello ${name},\n\nThank you for bringing "${subj}" to our attention. Our ${cat} engineering team has analyzed the root cause and applied an immediate fix to your environment.\n\nPlease verify on your end and let us know if you require any further assistance.\n\nBest regards,\nTicketFlow AI Support Team`
+                      setReply(draft)
+                    }}
+                  >
+                    ✨ AI Smart Auto-Reply (1-Click Draft)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
                     style={{ fontSize: '0.75rem', padding: '3px 10px', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.2)' }}
                     onClick={() => setReply("I've investigated the issue and deployed a hotfix to production. Everything is operational. Please confirm on your end.")}
                   >

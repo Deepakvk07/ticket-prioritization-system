@@ -8,11 +8,11 @@ import {
   Sparkles, PlusCircle, CheckCircle2, AlertCircle,
   Cpu, Send, Pencil, Bold, Italic, List, Link2, AtSign,
   HelpCircle, MessageSquare, Upload, X, ShieldCheck, Activity, RotateCcw,
-  Copy, ExternalLink
+  Copy, ExternalLink, Mic
 } from 'lucide-react'
 
 export default function HomePage({ user }) {
-  const { t } = useTranslation()
+  const { t, lang } = useTranslation()
   const navigate = useNavigate()
   const email = user?.email || ''
   const userName = user?.name || user?.user_metadata?.full_name || (email ? email.split('@')[0] : 'Valued Customer')
@@ -29,9 +29,33 @@ export default function HomePage({ user }) {
   const [description, setDescription] = useState('')
   const [contactEmail, setContactEmail] = useState(email)
   const [files, setFiles] = useState([])
-  const [dragOver, setDragOver] = useState(false)
-
+  const [isRecording, setIsRecording] = useState(false)
   const textareaRef = useRef(null)
+
+  const handleVoiceRecord = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge.')
+      return
+    }
+    try {
+      const recognition = new SpeechRecognition()
+      recognition.lang = lang === 'hi' ? 'hi-IN' : 'en-US'
+      recognition.interimResults = false
+      setIsRecording(true)
+
+      recognition.onresult = (e) => {
+        const transcript = e.results[0][0].transcript
+        setDescription(prev => (prev ? `${prev} ${transcript}` : transcript))
+        setIsRecording(false)
+      }
+      recognition.onerror = () => setIsRecording(false)
+      recognition.onend = () => setIsRecording(false)
+      recognition.start()
+    } catch {
+      setIsRecording(false)
+    }
+  }
 
   // Status & Messaging
   const [submitting, setSubmitting] = useState(false)
@@ -470,6 +494,23 @@ export default function HomePage({ user }) {
                       </button>
                       <button type="button" className="icon-btn" style={{ width: 30, height: 30 }} title="Mention User" onClick={() => insertFormatting('@')}>
                         <AtSign size={14} />
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        style={{
+                          marginLeft: 'auto', fontSize: '0.74rem', padding: '3px 10px',
+                          background: isRecording ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.1)',
+                          color: isRecording ? '#ef4444' : '#3b82f6',
+                          border: isRecording ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(59, 130, 246, 0.2)',
+                          fontWeight: 700
+                        }}
+                        onClick={handleVoiceRecord}
+                        title="Speak to type description hands-free"
+                      >
+                        <Mic size={13} />
+                        {isRecording ? (lang === 'hi' ? '🎙️ रिकॉर्डिंग चालू...' : '🎙️ Listening...') : (lang === 'hi' ? '🎙️ बोलकर टाइप करें' : '🎙️ Voice Note')}
                       </button>
                     </div>
 
