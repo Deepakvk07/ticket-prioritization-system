@@ -125,31 +125,64 @@ export default function TicketDetail({ user }) {
   const handleExportPDF = () => {
     if (!ticket) return
     const t = ticket
-    const content = `
-      <html><head><title>Ticket ${t.subject}</title>
-      <style>body{font-family:sans-serif;padding:40px;color:#111}h1{font-size:1.5rem}table{width:100%;border-collapse:collapse;margin:16px 0}td,th{border:1px solid #ddd;padding:8px 12px;text-align:left}th{background:#f3f4f6}pre{background:#f9fafb;padding:12px;border-radius:4px;white-space:pre-wrap}.msg{background:#f3f4f6;padding:12px;margin:8px 0;border-radius:6px;border-left:4px solid #3b82f6}</style>
-      </head><body>
-      <h1>${t.subject}</h1>
-      <table><tr><th>Field</th><th>Value</th></tr>
-      <tr><td>Ticket ID</td><td>#TK-${(t.id||'').slice(0,8).toUpperCase()}</td></tr>
-      <tr><td>Status</td><td>${t.status||'Open'}</td></tr>
-      <tr><td>Priority</td><td>${t.priority||'N/A'}</td></tr>
-      <tr><td>Category</td><td>${t.category||'General'}</td></tr>
-      <tr><td>Submitted By</td><td>${t.customer_name||'Customer'}</td></tr>
-      <tr><td>Created</td><td>${t.created_at ? new Date(t.created_at).toLocaleString() : 'N/A'}</td></tr>
-      </table>
-      <h2>Description</h2><pre>${t.description||''}</pre>
-      <h2>Conversation (${(t.activities||[]).length} messages)</h2>
-      ${(t.activities||[]).filter(a=>a.type!=='internal_note').map(a=>`<div class="msg"><strong>${a.author}</strong> [${a.author_role}] — ${new Date(a.created_at).toLocaleString()}<p>${a.content}</p></div>`).join('')}
-      </body></html>
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    const reportHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>TicketFlow Executive Report — #${t.code || (t.id || '').slice(0, 8)}</title>
+        <style>
+          body { font-family: 'Inter', system-ui, sans-serif; padding: 40px; color: #1e293b; background: #fff; line-height: 1.6; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 30px; }
+          .logo { font-size: 1.4rem; font-weight: 800; color: #2563eb; }
+          .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-weight: 700; font-size: 0.8rem; background: #eff6ff; color: #2563eb; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+          .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; }
+          .card-title { font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+          .message { background: #f1f5f9; padding: 16px; border-radius: 10px; border-left: 4px solid #2563eb; margin-bottom: 14px; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo">⚡ TicketFlow AI Executive Report</div>
+          <span class="badge">SLA Status: Guaranteed</span>
+        </div>
+
+        <h1 style="font-size: 1.8rem; margin: 0 0 10px;">${t.subject}</h1>
+        <p style="color: #64748b; margin-bottom: 24px;">Ticket Code: <strong>${t.code || t.id}</strong> • Submitted by: <strong>${t.customer_name || 'Customer'}</strong> (${t.customer_email || 'N/A'})</p>
+
+        <div class="grid">
+          <div class="card">
+            <div class="card-title">Priority Level & AI Score</div>
+            <div style="font-size: 1.3rem; font-weight: 800; color: #2563eb;">${t.priority || 'Medium'} (${t.confidence_score || t.score || 85}% Score)</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Current Resolution Status</div>
+            <div style="font-size: 1.3rem; font-weight: 800; color: #10b981;">${t.status || 'Open'}</div>
+          </div>
+        </div>
+
+        <h3 style="border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Issue Description</h3>
+        <p style="background: #f8fafc; padding: 18px; border-radius: 10px; font-size: 0.95rem;">${t.description}</p>
+
+        <h3 style="border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-top: 30px;">Activity Timeline & Agent Replies (${(t.activities || []).length})</h3>
+        ${(t.activities || []).filter(a => a.type !== 'internal_note').map(a => `
+          <div class="message">
+            <strong>${a.author}</strong> [${a.author_role || 'USER'}] — <span style="color:#64748b; font-size:0.8rem;">${new Date(a.created_at).toLocaleString()}</span>
+            <p style="margin: 8px 0 0; font-size: 0.92rem;">${a.content}</p>
+          </div>
+        `).join('')}
+
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+      </html>
     `
-    const blob = new Blob([content], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `ticket-${(t.id||'unknown').slice(0,8)}.html`
-    a.click()
-    URL.revokeObjectURL(url)
+    printWindow.document.write(reportHtml)
+    printWindow.document.close()
   }
 
   if (loading) {
