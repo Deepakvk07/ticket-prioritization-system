@@ -195,40 +195,6 @@ export default function Dashboard({ user }) {
             </div>
           </div>
 
-          {/* ⚡ Live SLA Target & Risk Health Widget */}
-          <div className="card" style={{ padding: '20px 24px', marginBottom: 24, background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.6), rgba(30, 41, 59, 0.4))', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Clock size={18} color="#3b82f6" /> Live SLA Target & Queue Risk Health
-              </div>
-              <span className="badge badge-medium" style={{ fontSize: '0.72rem' }}>SLA Enforcement Active</span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-              <div style={{ padding: 14, borderRadius: 12, background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
-                <div style={{ fontSize: '0.76rem', fontWeight: 700, color: '#10b981', textTransform: 'uppercase', marginBottom: 4 }}>🟢 On Track (Compliant)</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981' }}>
-                  {tickets.filter(t => t.status !== 'Resolved' && t.status !== 'Closed' && t.priority !== 'Critical').length || 0} Tickets
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Within response window</div>
-              </div>
-
-              <div style={{ padding: 14, borderRadius: 12, background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
-                <div style={{ fontSize: '0.76rem', fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', marginBottom: 4 }}>🟠 Near Breach (Under 30m)</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f59e0b' }}>
-                  {tickets.filter(t => t.priority === 'Critical' && t.status === 'Open').length || 0} Tickets
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Requires priority routing</div>
-              </div>
-
-              <div style={{ padding: 14, borderRadius: 12, background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
-                <div style={{ fontSize: '0.76rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', marginBottom: 4 }}>🔴 SLA Breached</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ef4444' }}>0 Tickets</div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Zero breach policy enforced</div>
-              </div>
-            </div>
-          </div>
-
           {/* Registered Agents by Category View Section */}
           {isAdmin && (
             <div style={{ marginBottom: 28 }}>

@@ -477,32 +477,6 @@ export default function AdminLogin() {
             </form>
           ) : (
             <form onSubmit={handleVerifyOtp}>
-              {/* Live Demo Security OTP Display Card */}
-              <div style={{
-                padding: '14px 18px', borderRadius: 12, marginBottom: 20,
-                background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-              }}>
-                <div>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    🔐 Live Security OTP Code
-                  </div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1d4ed8', letterSpacing: '0.25em', fontFamily: 'monospace' }}>
-                    {generatedOtp}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setOtp(generatedOtp)}
-                  style={{
-                    padding: '6px 12px', borderRadius: 8, background: '#2563eb', color: '#ffffff',
-                    border: 'none', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer'
-                  }}
-                >
-                  Auto-Fill OTP
-                </button>
-              </div>
-
               <div style={{ marginBottom: 24 }}>
                 <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: 8, display: 'block' }}>
                   6-Digit OTP Security Code
