@@ -43,24 +43,29 @@ export default function AdminLogin() {
   }
 
   const sendOtpEmail = async (targetEmail, code) => {
-    // 1. Primary EmailJS Browser Dispatch
-    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_ticketflow'
-    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_otp'
-    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'user_public_key'
+    // 1. Primary EmailJS Browser Dispatch with exact credentials
+    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_rpo1fc9'
+    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_hcyfn2r'
+    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'dT4AFVfna3YalUuM8'
 
     try {
-      await emailjs.send(
+      const res = await emailjs.send(
         serviceId,
         templateId,
         {
           to_email: targetEmail,
+          email: targetEmail,
+          user_email: targetEmail,
           to_name: 'System Administrator',
+          name: 'System Administrator',
           otp_code: code,
+          code: code,
+          otp: code,
           message: `Your 2-step security verification code for TicketFlow AI is: ${code}`
         },
         publicKey
       )
-      console.log('EmailJS OTP email dispatched successfully to', targetEmail)
+      console.log('EmailJS OTP email dispatched successfully:', res.status, res.text)
     } catch (emailJsErr) {
       console.warn('EmailJS fallback to backend SMTP:', emailJsErr)
       // 2. Secondary Backend SMTP Dispatch Fallback
