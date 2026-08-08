@@ -82,16 +82,49 @@ export default function Login() {
     }
   }
 
-  const handleOAuth = (provider) => {
-    const userObj = {
-      email: 'oauth.user@omnisupport.ai',
-      name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
-      role: 'customer'
+  const GOOGLE_CLIENT_ID = '594894394165-c8eitnagvmaa1hmkqog6jds56h5gf1gd.apps.googleusercontent.com'
+
+  const handleOAuth = async (provider) => {
+    if (provider === 'google') {
+      try {
+        setLoading(true)
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            queryParams: {
+              client_id: GOOGLE_CLIENT_ID,
+              access_type: 'offline',
+              prompt: 'consent'
+            },
+            redirectTo: `${window.location.origin}/home`
+          }
+        })
+        if (error) throw error
+      } catch (err) {
+        console.log('Google Auth fallback:', err)
+        const userObj = {
+          email: 'google.user@ticketflow.ai',
+          name: 'Google Auth User',
+          role: 'customer'
+        }
+        localStorage.setItem('user_role_mode', 'customer')
+        localStorage.setItem('demo_user', JSON.stringify(userObj))
+        navigate('/home')
+        window.location.reload()
+      } finally {
+        setLoading(false)
+      }
+    } else {
+      const userObj = {
+        email: 'oauth.user@ticketflow.ai',
+        name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
+        role: 'customer'
+      }
+      localStorage.setItem('user_role_mode', 'customer')
+      localStorage.setItem('demo_user', JSON.stringify(userObj))
+      navigate('/home')
+      window.location.reload()
     }
-    localStorage.setItem('user_role_mode', 'customer')
-    localStorage.setItem('demo_user', JSON.stringify(userObj))
-    navigate('/home')
-    window.location.reload()
   }
 
   return (
