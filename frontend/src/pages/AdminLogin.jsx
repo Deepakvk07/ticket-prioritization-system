@@ -504,37 +504,100 @@ export default function AdminLogin() {
               </div>
             </form>
           ) : (
-            <form onSubmit={handleVerifyOtp}>
-              <div style={{ marginBottom: 24 }}>
-                <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: 8, display: 'block' }}>
-                  6-Digit OTP Security Code
-                </label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  className="clean-input"
-                  placeholder="e.g. 849201"
-                  value={otp}
-                  onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                  style={{ fontSize: '1.4rem', letterSpacing: '0.3em', textAlign: 'center', fontWeight: 700, fontFamily: 'monospace' }}
-                  required
-                  autoFocus
-                />
+            <form onSubmit={handleVerifyOtp} className="animate-fade">
+              {/* Security Status Box */}
+              <div style={{
+                padding: '12px 16px', borderRadius: 12, marginBottom: 24,
+                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.06), rgba(59, 130, 246, 0.12))',
+                border: '1px solid rgba(37, 99, 235, 0.25)', display: 'flex', alignItems: 'center', gap: 12
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, background: '#2563eb', color: '#ffffff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                }}>
+                  <Lock size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    2-Factor Authentication Required
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#334155', fontWeight: 600 }}>
+                    Security OTP sent to <strong style={{ color: '#0f172a' }}>{adminUser?.email || email}</strong>
+                  </div>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-                <button type="submit" className="admin-submit-btn" style={{ flex: 1 }} disabled={loading}>
-                  {loading ? 'Verifying Code…' : 'Verify OTP & Enter Control Panel'}
+              {/* 6 Digit Box Grid */}
+              <div style={{ marginBottom: 28 }}>
+                <label style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b', marginBottom: 12, display: 'block', textAlign: 'center' }}>
+                  ENTER 6-DIGIT VERIFICATION CODE
+                </label>
+
+                <div style={{ position: 'relative' }}>
+                  {/* Visual 6 Digit Boxes */}
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
+                    {[0, 1, 2, 3, 4, 5].map(idx => {
+                      const digit = otp[idx] || ''
+                      const isFocused = otp.length === idx || (otp.length === 6 && idx === 5)
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            width: 48,
+                            height: 56,
+                            borderRadius: 12,
+                            background: isFocused ? '#ffffff' : '#f8fafc',
+                            border: isFocused ? '2px solid #2563eb' : digit ? '1.5px solid #3b82f6' : '1px solid #cbd5e1',
+                            boxShadow: isFocused ? '0 0 0 4px rgba(37, 99, 235, 0.15), 0 4px 12px rgba(37, 99, 235, 0.1)' : 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1.6rem',
+                            fontWeight: 800,
+                            color: '#0f172a',
+                            fontFamily: 'monospace',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          {digit}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Hidden Master Input Overlay */}
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={otp}
+                    onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      opacity: 0,
+                      cursor: 'pointer',
+                      width: '100%',
+                      height: '100%'
+                    }}
+                    required
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <button type="submit" className="admin-submit-btn" style={{ width: '100%', padding: '14px', fontSize: '0.95rem' }} disabled={loading}>
+                  {loading ? 'Verifying Code…' : 'Verify Code & Access Control Panel →'}
                 </button>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.84rem', paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0 }}
+                  style={{ background: 'none', border: 'none', color: '#64748b', fontWeight: 600, cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}
                 >
-                  ← Back to Login
+                  <ArrowLeft size={14} /> Back to Sign In
                 </button>
                 <button
                   type="button"
@@ -546,7 +609,7 @@ export default function AdminLogin() {
                     fontWeight: 700, cursor: resendTimer > 0 ? 'default' : 'pointer', padding: 0
                   }}
                 >
-                  {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP Code'}
+                  {resendTimer > 0 ? `Resend code in ${resendTimer}s` : 'Resend Code'}
                 </button>
               </div>
             </form>
