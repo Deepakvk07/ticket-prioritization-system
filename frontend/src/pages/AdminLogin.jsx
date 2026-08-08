@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { signInAdmin } from '../services/admins'
 import { Eye, EyeOff, ShieldCheck, CheckCircle2, ArrowLeft, Lock, Sparkles, Cpu } from 'lucide-react'
 
+import emailjs from '@emailjs/browser'
+
 export default function AdminLogin() {
   const navigate = useNavigate()
   const [step, setStep] = useState(1) // 1: Email/Password, 2: OTP Code
@@ -40,18 +42,39 @@ export default function AdminLogin() {
     localStorage.removeItem('demo_user')
   }
 
-  const sendOtpEmail = (targetEmail, code) => {
-    // Attempt sending real SMTP email via backend API
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    fetch(`${API_URL}/api/send-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to_email: targetEmail,
-        subject: '🔒 TicketFlow AI — Admin 2-Step Security OTP Code',
-        body: `Hello System Administrator,\n\nYour 2-step verification code for TicketFlow AI Control Portal is: ${code}\n\nThis code will expire in 10 minutes.\n\nIf you did not request this code, please secure your account immediately.\n\nRegards,\nTicketFlow AI Security System`
-      })
-    }).catch(() => null)
+  const sendOtpEmail = async (targetEmail, code) => {
+    // 1. Primary EmailJS Browser Dispatch
+    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_ticketflow'
+    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_otp'
+    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'user_public_key'
+
+    try {
+      await emailjs.send(
+        serviceId,
+        templateId,
+        {
+          to_email: targetEmail,
+          to_name: 'System Administrator',
+          otp_code: code,
+          message: `Your 2-step security verification code for TicketFlow AI is: ${code}`
+        },
+        publicKey
+      )
+      console.log('EmailJS OTP email dispatched successfully to', targetEmail)
+    } catch (emailJsErr) {
+      console.warn('EmailJS fallback to backend SMTP:', emailJsErr)
+      // 2. Secondary Backend SMTP Dispatch Fallback
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      fetch(`${API_URL}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to_email: targetEmail,
+          subject: '🔒 TicketFlow AI — Admin 2-Step Security OTP Code',
+          body: `Hello System Administrator,\n\nYour 2-step verification code for TicketFlow AI Control Portal is: ${code}\n\nThis code will expire in 10 minutes.\n\nIf you did not request this code, please secure your account immediately.\n\nRegards,\nTicketFlow AI Security System`
+        })
+      }).catch(() => null)
+    }
   }
 
   const handleAdminSignIn = async (e) => {
