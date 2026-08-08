@@ -392,16 +392,6 @@ export default function AgentLogin() {
 
       {/* Right Panel — Clean Centered White Form */}
       <div className="agent-form-panel">
-        <div style={{ position: 'absolute', top: 36, right: 44 }}>
-          <button
-            type="button"
-            onClick={() => navigate('/login')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 20, background: '#f8fafc', color: '#475569', fontSize: '0.8rem', fontWeight: 600, border: '1px solid #cbd5e1', cursor: 'pointer', transition: 'all 0.2s ease' }}
-          >
-            <ArrowLeft size={14} /> Back to Sign In
-          </button>
-        </div>
-
         <div className="agent-form-inner">
           <div className="agent-tag">
             <Headphones size={14} /> {tab === 'signin' ? 'Agent Authentication' : 'Agent Registration'}
