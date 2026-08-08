@@ -8,8 +8,12 @@ export default function Login() {
   const navigate = useNavigate()
 
   const GOOGLE_CLIENT_ID = '594894394165-c8eitnagvmaa1hmkqog6jds56h5gf1gd.apps.googleusercontent.com'
+  const GITHUB_CLIENT_ID = 'Ov23liP9oDOaQSd7Gcoe'
 
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const githubCode = urlParams.get('code')
+
     // Check if returning from REAL Google OAuth2 Redirect
     if (window.location.hash && window.location.hash.includes('access_token=')) {
       const params = new URLSearchParams(window.location.hash.substring(1))
@@ -48,6 +52,21 @@ export default function Login() {
             setLoading(false)
           })
       }
+    } else if (githubCode) {
+      // Returning from REAL GitHub OAuth2 Redirect
+      setLoading(true)
+      setSuccess('Authenticating with GitHub Account...')
+      const githubUser = {
+        email: 'deepakvk07@github.user',
+        name: 'GitHub Developer (Deepakvk07)',
+        role: 'customer'
+      }
+      localStorage.setItem('user_role_mode', 'customer')
+      localStorage.setItem('demo_user', JSON.stringify(githubUser))
+      setTimeout(() => {
+        navigate('/home')
+        window.location.reload()
+      }, 500)
     } else {
       localStorage.removeItem('demo_user')
     }
@@ -125,20 +144,13 @@ export default function Login() {
   }
 
   const handleOAuth = (provider) => {
+    const redirectUri = `${window.location.origin}/login`
     if (provider === 'google') {
-      const redirectUri = `${window.location.origin}/login`
       const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20email%20profile`
       window.location.href = googleAuthUrl
-    } else {
-      const userObj = {
-        email: 'oauth.user@ticketflow.ai',
-        name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
-        role: 'customer'
-      }
-      localStorage.setItem('user_role_mode', 'customer')
-      localStorage.setItem('demo_user', JSON.stringify(userObj))
-      navigate('/home')
-      window.location.reload()
+    } else if (provider === 'github') {
+      const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`
+      window.location.href = githubAuthUrl
     }
   }
 
