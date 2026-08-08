@@ -7,9 +7,51 @@ import { Eye, EyeOff, ShieldCheck, CheckCircle2 } from 'lucide-react'
 export default function Login() {
   const navigate = useNavigate()
 
+  const GOOGLE_CLIENT_ID = '594894394165-c8eitnagvmaa1hmkqog6jds56h5gf1gd.apps.googleusercontent.com'
+
   useEffect(() => {
-    localStorage.removeItem('demo_user')
-  }, [])
+    // Check if returning from REAL Google OAuth2 Redirect
+    if (window.location.hash && window.location.hash.includes('access_token=')) {
+      const params = new URLSearchParams(window.location.hash.substring(1))
+      const accessToken = params.get('access_token')
+
+      if (accessToken) {
+        setLoading(true)
+        setSuccess('Authenticating with Google Account...')
+        
+        fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.email) {
+              const googleUser = {
+                email: data.email,
+                name: data.name || data.given_name || data.email.split('@')[0],
+                avatar_url: data.picture || null,
+                role: 'customer'
+              }
+              localStorage.setItem('user_role_mode', 'customer')
+              localStorage.setItem('demo_user', JSON.stringify(googleUser))
+              setSuccess(`Signed in as ${googleUser.name} (${googleUser.email})!`)
+              setTimeout(() => {
+                navigate('/home')
+                window.location.reload()
+              }, 500)
+            } else {
+              setError('Failed to retrieve Google profile data.')
+              setLoading(false)
+            }
+          })
+          .catch(() => {
+            setError('Google token verification failed.')
+            setLoading(false)
+          })
+      }
+    } else {
+      localStorage.removeItem('demo_user')
+    }
+  }, [navigate])
 
   const [tab, setTab] = useState('signin') // 'signin' | 'create'
   const [fullName, setFullName] = useState('')
@@ -82,22 +124,21 @@ export default function Login() {
     }
   }
 
-  const GOOGLE_CLIENT_ID = '594894394165-c8eitnagvmaa1hmkqog6jds56h5gf1gd.apps.googleusercontent.com'
-
-  const handleOAuth = async (provider) => {
-    setLoading(true)
-    try {
+  const handleOAuth = (provider) => {
+    if (provider === 'google') {
+      const redirectUri = `${window.location.origin}/login`
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20email%20profile`
+      window.location.href = googleAuthUrl
+    } else {
       const userObj = {
-        email: provider === 'google' ? 'deepakvishwakarma9532@gmail.com' : `${provider}.user@ticketflow.ai`,
-        name: provider === 'google' ? 'Deepak Vishwakarma' : `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
+        email: 'oauth.user@ticketflow.ai',
+        name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
         role: 'customer'
       }
       localStorage.setItem('user_role_mode', 'customer')
       localStorage.setItem('demo_user', JSON.stringify(userObj))
       navigate('/home')
       window.location.reload()
-    } finally {
-      setLoading(false)
     }
   }
 
