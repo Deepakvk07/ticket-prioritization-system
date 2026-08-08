@@ -6,23 +6,52 @@ import { Eye, EyeOff, ShieldCheck, CheckCircle2, ArrowLeft, Lock, Sparkles, Cpu 
 
 export default function AdminLogin() {
   const navigate = useNavigate()
+  const [step, setStep] = useState(1) // 1: Email/Password, 2: OTP Code
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [otp, setOtp] = useState('')
+  const [generatedOtp, setGeneratedOtp] = useState('')
+  const [adminUser, setAdminUser] = useState(null)
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [resendTimer, setResendTimer] = useState(30)
 
   useEffect(() => {
     localStorage.removeItem('demo_user')
   }, [])
 
+  useEffect(() => {
+    let interval = null
+    if (step === 2 && resendTimer > 0) {
+      interval = setInterval(() => setResendTimer(t => t - 1), 1000)
+    }
+    return () => clearInterval(interval)
+  }, [step, resendTimer])
+
   const handleClear = () => {
     setEmail('')
     setPassword('')
+    setOtp('')
     setError('')
     setSuccess('')
+    setStep(1)
     localStorage.removeItem('demo_user')
+  }
+
+  const sendOtpEmail = (targetEmail, code) => {
+    // Attempt sending real SMTP email via backend API
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    fetch(`${API_URL}/api/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to_email: targetEmail,
+        subject: '🔒 TicketFlow AI — Admin 2-Step Security OTP Code',
+        body: `Hello System Administrator,\n\nYour 2-step verification code for TicketFlow AI Control Portal is: ${code}\n\nThis code will expire in 10 minutes.\n\nIf you did not request this code, please secure your account immediately.\n\nRegards,\nTicketFlow AI Security System`
+      })
+    }).catch(() => null)
   }
 
   const handleAdminSignIn = async (e) => {
@@ -48,24 +77,60 @@ export default function AdminLogin() {
         return
       }
 
-      localStorage.setItem('user_role_mode', 'admin')
-      localStorage.setItem('demo_user', JSON.stringify({
-        email: adminObj.email,
-        role: 'admin',
-        name: adminObj.name
-      }))
+      // Generate 6-digit random OTP
+      const newOtp = Math.floor(100000 + Math.random() * 900000).toString()
+      setGeneratedOtp(newOtp)
+      setAdminUser(adminObj)
+      sendOtpEmail(adminObj.email, newOtp)
 
-      setSuccess('Admin authentication granted! Entering control panel...')
-      setTimeout(() => {
-        navigate('/dashboard')
-        window.location.reload()
-      }, 400)
+      setStep(2)
+      setResendTimer(30)
+      setSuccess(`🔐 2-Step Verification required. A 6-digit OTP code has been sent to ${adminObj.email}`)
     } catch (err) {
       console.error('Admin sign in error:', err)
       setError(err?.message || 'Authentication failed. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleResendOtp = () => {
+    if (resendTimer > 0 || !adminUser) return
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString()
+    setGeneratedOtp(newOtp)
+    sendOtpEmail(adminUser.email, newOtp)
+    setResendTimer(30)
+    setError('')
+    setSuccess(`🔑 New OTP code sent to ${adminUser.email}`)
+  }
+
+  const handleVerifyOtp = (e) => {
+    e.preventDefault()
+    if (!otp.trim()) {
+      setError('Please enter the 6-digit security OTP code.')
+      return
+    }
+
+    if (otp.trim() !== generatedOtp) {
+      setError('Incorrect OTP code. Please check your email and try again.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    setSuccess('✅ 2-Step Security Verification Passed! Entering Admin Portal...')
+
+    localStorage.setItem('user_role_mode', 'admin')
+    localStorage.setItem('demo_user', JSON.stringify({
+      email: adminUser.email,
+      role: 'admin',
+      name: adminUser.name
+    }))
+
+    setTimeout(() => {
+      navigate('/dashboard')
+      window.location.reload()
+    }, 400)
   }
 
   return (
@@ -340,73 +405,150 @@ export default function AdminLogin() {
           </div>
 
           <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
-            Admin Portal Sign In
+            {step === 1 ? 'Admin Portal Sign In' : '2-Step Security Verification'}
           </h2>
-          <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: 28 }}>
-            Please enter your administrator credentials to access the system control panel.
+          <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: 24 }}>
+            {step === 1
+              ? 'Please enter your administrator credentials to access the system control panel.'
+              : `Enter the 6-digit security code sent to ${adminUser?.email || email}.`}
           </p>
 
-          {error && <div className="alert-box error">{error}</div>}
-          {success && <div className="alert-box success">{success}</div>}
+          {error && <div className="alert-box error" style={{ padding: 12, borderRadius: 10, marginBottom: 16, fontSize: '0.85rem', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>{error}</div>}
+          {success && <div className="alert-box success" style={{ padding: 12, borderRadius: 10, marginBottom: 16, fontSize: '0.85rem', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0' }}>{success}</div>}
 
-          <form onSubmit={handleAdminSignIn}>
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: 6, display: 'block' }}>Admin Email Address</label>
-              <input
-                type="email"
-                className="clean-input"
-                placeholder="admin@ticketflow.ai"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: 6, display: 'block' }}>Password</label>
-              <div style={{ position: 'relative' }}>
+          {step === 1 ? (
+            <form onSubmit={handleAdminSignIn}>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: 6, display: 'block' }}>Admin Email Address</label>
                 <input
-                  type={showPass ? 'text' : 'password'}
+                  type="email"
                   className="clean-input"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  placeholder="admin@ticketflow.ai"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
                   required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPass(!showPass)}
-                  style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
-                >
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
               </div>
-            </div>
 
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button type="submit" className="admin-submit-btn" style={{ flex: 1 }} disabled={loading}>
-                {loading ? 'Authenticating…' : 'Sign In to Admin Portal'}
-              </button>
-              {(email || password) && (
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: 6, display: 'block' }}>Password</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    className="clean-input"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(!showPass)}
+                    style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+                  >
+                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button type="submit" className="admin-submit-btn" style={{ flex: 1 }} disabled={loading}>
+                  {loading ? 'Authenticating…' : 'Send OTP Security Code →'}
+                </button>
+                {(email || password) && (
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    style={{
+                      padding: '12px 18px',
+                      borderRadius: 10,
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      color: '#64748b',
+                      fontWeight: 600,
+                      fontSize: '0.86rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyOtp}>
+              {/* Live Demo Security OTP Display Card */}
+              <div style={{
+                padding: '14px 18px', borderRadius: 12, marginBottom: 20,
+                background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    🔐 Live Security OTP Code
+                  </div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1d4ed8', letterSpacing: '0.25em', fontFamily: 'monospace' }}>
+                    {generatedOtp}
+                  </div>
+                </div>
                 <button
                   type="button"
-                  onClick={handleClear}
+                  onClick={() => setOtp(generatedOtp)}
                   style={{
-                    padding: '12px 18px',
-                    borderRadius: 10,
-                    border: '1px solid #cbd5e1',
-                    background: '#f8fafc',
-                    color: '#64748b',
-                    fontWeight: 600,
-                    fontSize: '0.86rem',
-                    cursor: 'pointer'
+                    padding: '6px 12px', borderRadius: 8, background: '#2563eb', color: '#ffffff',
+                    border: 'none', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer'
                   }}
                 >
-                  Clear
+                  Auto-Fill OTP
                 </button>
-              )}
-            </div>
-          </form>
+              </div>
+
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: 8, display: 'block' }}>
+                  6-Digit OTP Security Code
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  className="clean-input"
+                  placeholder="e.g. 849201"
+                  value={otp}
+                  onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                  style={{ fontSize: '1.4rem', letterSpacing: '0.3em', textAlign: 'center', fontWeight: 700, fontFamily: 'monospace' }}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                <button type="submit" className="admin-submit-btn" style={{ flex: 1 }} disabled={loading}>
+                  {loading ? 'Verifying Code…' : 'Verify OTP & Enter Control Panel'}
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0 }}
+                >
+                  ← Back to Login
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={resendTimer > 0}
+                  style={{
+                    background: 'none', border: 'none',
+                    color: resendTimer > 0 ? '#94a3b8' : '#2563eb',
+                    fontWeight: 700, cursor: resendTimer > 0 ? 'default' : 'pointer', padding: 0
+                  }}
+                >
+                  {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP Code'}
+                </button>
+              </div>
+            </form>
+          )}
 
           <div style={{ textAlign: 'center', marginTop: 32, fontSize: '0.8rem', color: '#94a3b8' }}>
             TicketFlow AI &bull; Encrypted Staff Control Portal
