@@ -1,4 +1,4 @@
-import { useNavigate } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { FileText, ShieldCheck, ArrowLeft, Clock, CheckCircle2 } from 'lucide-react'
