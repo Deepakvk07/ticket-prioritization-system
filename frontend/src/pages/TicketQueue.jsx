@@ -367,7 +367,6 @@ export default function TicketQueue({ user }) {
                     {!isCustomer && <th>Priority Level</th>}
                     {!isCustomer && <th>Score</th>}
                     <th>Ticket</th>
-                    {!isCustomer && <th>Category</th>}
                     <th>Assigned Agent</th>
                     <th>Status</th>
                     <th>Created</th>
@@ -377,7 +376,7 @@ export default function TicketQueue({ user }) {
                 <tbody>
                   {sorted.length === 0 && !loading && (
                     <tr>
-                      <td colSpan={isCustomer ? 5 : 9} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+                      <td colSpan={isCustomer ? 5 : 8} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
                         <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>📭</div>
                         <div style={{ fontWeight: 600, marginBottom: 4 }}>No tickets in your workspace queue</div>
                         <div style={{ fontSize: '0.82rem' }}>
@@ -441,7 +440,6 @@ export default function TicketQueue({ user }) {
                           <div style={{ fontWeight: 600 }}>{t.subject}</div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>#{t.code || t.id} · {t.customer_name}</div>
                         </td>
-                        {!isCustomer && <td style={{ color: 'var(--text-muted)' }}>{t.category}</td>}
 
                         {/* Assigned Agent Selector / Badge */}
                         <td onClick={(e) => e.stopPropagation()}>

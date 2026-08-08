@@ -326,7 +326,6 @@ export default function Dashboard({ user }) {
                     <th>{t('priority_level')}</th>
                     <th>{t('ai_score')}</th>
                     <th>{t('ticket_subject')}</th>
-                    <th>{t('category')}</th>
                     <th>{t('assigned_agent')}</th>
                     <th>{t('status')}</th>
                     <th>{t('created')}</th>
@@ -336,7 +335,7 @@ export default function Dashboard({ user }) {
                 <tbody>
                   {sortedTickets.length === 0 && !loading && (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-muted)' }}>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-muted)' }}>
                         <div style={{ fontSize: '1.8rem', marginBottom: 8 }}>📭</div>
                         <div style={{ fontWeight: 700, fontSize: '0.98rem', marginBottom: 4, color: 'var(--text-primary)' }}>No active tickets in queue</div>
                         <div style={{ fontSize: '0.82rem', maxWidth: 440, margin: '0 auto' }}>
@@ -410,13 +409,6 @@ function TicketRow({ t, navigate, registeredAgents, onAssignAgent, isAssigning }
       <td>
         <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>{t.subject}</div>
         <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>#{t.id?.slice(0, 8).toUpperCase() || 'TK-1042'} &bull; {t.customer_name || 'Customer'}</div>
-      </td>
-
-      {/* Category */}
-      <td>
-        <span style={{ fontSize: '0.78rem', background: 'var(--bg-card-hover)', padding: '3px 8px', borderRadius: 6, color: 'var(--text-secondary)', fontWeight: 600 }}>
-          {dept}
-        </span>
       </td>
 
       {/* Registered Agent Dropdown — ONLY shows agents registered by user */}
