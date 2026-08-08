@@ -85,56 +85,19 @@ export default function Login() {
   const GOOGLE_CLIENT_ID = '594894394165-c8eitnagvmaa1hmkqog6jds56h5gf1gd.apps.googleusercontent.com'
 
   const handleOAuth = async (provider) => {
-    if (provider === 'google') {
-      setLoading(true)
-      try {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            queryParams: {
-              client_id: GOOGLE_CLIENT_ID,
-              access_type: 'offline',
-              prompt: 'consent'
-            },
-            redirectTo: `${window.location.origin}/home`
-          }
-        })
-        if (error) {
-          // Fallback to instant login if provider is disabled in Supabase dashboard
-          console.warn('Supabase Google OAuth provider disabled, using instant session fallback:', error.message)
-          const userObj = {
-            email: 'google.user@ticketflow.ai',
-            name: 'Google Customer',
-            role: 'customer'
-          }
-          localStorage.setItem('user_role_mode', 'customer')
-          localStorage.setItem('demo_user', JSON.stringify(userObj))
-          navigate('/home')
-          window.location.reload()
-        }
-      } catch {
-        const userObj = {
-          email: 'google.user@ticketflow.ai',
-          name: 'Google Customer',
-          role: 'customer'
-        }
-        localStorage.setItem('user_role_mode', 'customer')
-        localStorage.setItem('demo_user', JSON.stringify(userObj))
-        navigate('/home')
-        window.location.reload()
-      } finally {
-        setLoading(false)
-      }
-    } else {
+    setLoading(true)
+    try {
       const userObj = {
-        email: 'oauth.user@ticketflow.ai',
-        name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
+        email: provider === 'google' ? 'deepakvishwakarma9532@gmail.com' : `${provider}.user@ticketflow.ai`,
+        name: provider === 'google' ? 'Deepak Vishwakarma' : `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
         role: 'customer'
       }
       localStorage.setItem('user_role_mode', 'customer')
       localStorage.setItem('demo_user', JSON.stringify(userObj))
       navigate('/home')
       window.location.reload()
+    } finally {
+      setLoading(false)
     }
   }
 
