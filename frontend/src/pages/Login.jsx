@@ -736,7 +736,7 @@ export default function Login() {
           </div>
 
           <div className="footer-support-text">
-            Need help? <a href="https://wa.me/916392376195?text=Hello%20TicketFlow%20AI%20Support%2C%20I%20need%20assistance" target="_blank" rel="noreferrer" style={{ color: '#2563eb', fontWeight: 700 }}>💬 Contact our dedicated WhatsApp support (+91 6392376195)</a>
+            Need help? <a href="https://wa.me/916392376195?text=Hello%20TicketFlow%20AI%20Support%2C%20I%20need%20assistance" target="_blank" rel="noreferrer">Contact our dedicated support</a>
           </div>
         </div>
       </div>
