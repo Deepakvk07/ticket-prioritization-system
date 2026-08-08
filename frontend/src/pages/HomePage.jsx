@@ -614,59 +614,19 @@ export default function HomePage({ user }) {
             lineHeight: 1.6
           }}>
             {/* Corporate Links Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 30, marginBottom: 30 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20, marginBottom: 24 }}>
               <div>
-                <div style={{ fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, fontSize: '0.95rem' }}>
+                <div style={{ fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4, fontSize: '0.95rem' }}>
                   TicketFlow AI™
                 </div>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
                   Next-generation autonomous ticket resolution hub and priority triage platform.
                 </p>
               </div>
 
-              <div>
-                <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12, fontSize: '0.88rem' }}>
-                  Trust & Compliance
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.82rem' }}>
-                  <button
-                    onClick={() => navigate('/security-telemetry')}
-                    style={{ background: 'none', border: 'none', color: '#3b82f6', textAlign: 'left', cursor: 'pointer', padding: 0, fontWeight: 600 }}
-                  >
-                    → Security Telemetry
-                  </button>
-                  <button
-                    onClick={() => navigate('/privacy-policy')}
-                    style={{ background: 'none', border: 'none', color: '#3b82f6', textAlign: 'left', cursor: 'pointer', padding: 0, fontWeight: 600 }}
-                  >
-                    → Privacy Policy
-                  </button>
-                  <button
-                    onClick={() => navigate('/terms-of-service')}
-                    style={{ background: 'none', border: 'none', color: '#3b82f6', textAlign: 'left', cursor: 'pointer', padding: 0, fontWeight: 600 }}
-                  >
-                    → Terms of Service
-                  </button>
-                  <button
-                    onClick={() => navigate('/trust-center')}
-                    style={{ background: 'none', border: 'none', color: '#3b82f6', textAlign: 'left', cursor: 'pointer', padding: 0, fontWeight: 600 }}
-                  >
-                    → Trust Center
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12, fontSize: '0.88rem' }}>
-                  System Health & Uptime
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.84rem', color: '#10b981', fontWeight: 700, marginBottom: 8 }}>
-                  <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 8px #10b981' }} />
-                  All Systems Operational
-                </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  Continuous database replication & API gateway monitoring active.
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.84rem', color: '#10b981', fontWeight: 700 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 8px #10b981' }} />
+                All Systems Operational
               </div>
             </div>
 
