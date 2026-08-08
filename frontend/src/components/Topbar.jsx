@@ -91,10 +91,28 @@ export default function Topbar({ user, placeholder }) {
   }
 
   const handleLogout = async () => {
+    const currentPath = window.location.pathname
+    const userRole = user?.role || localStorage.getItem('user_role_mode')
+
     localStorage.removeItem('demo_user')
     localStorage.removeItem('user_role_mode')
     try { await supabase.auth.signOut() } catch { /* ignore */ }
-    navigate('/home')
+
+    // Redirect to specific portal based on section / user role
+    if (currentPath.includes('/admin') || currentPath.includes('/models') || userRole === 'admin') {
+      window.location.href = '/admin'
+    } else if (
+      currentPath.includes('/queue') ||
+      currentPath.includes('/dashboard') ||
+      currentPath.includes('/analytics') ||
+      currentPath.includes('/agents') ||
+      userRole === 'agent' ||
+      userRole === 'manager'
+    ) {
+      window.location.href = '/agent-login'
+    } else {
+      window.location.href = '/login'
+    }
   }
 
   const getIcon = (icon) => {
@@ -330,6 +348,18 @@ export default function Topbar({ user, placeholder }) {
               </NavLink>
             )
           })}
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 16px', borderRadius: 10, fontSize: '0.92rem',
+              fontWeight: 700, color: '#ef4444', background: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.2)', cursor: 'pointer', width: '100%', marginTop: 8
+            }}
+          >
+            <LogOut size={18} />
+            <span>Log Out</span>
+          </button>
         </div>
       )}
     </header>
