@@ -86,9 +86,9 @@ export default function Login() {
 
   const handleOAuth = async (provider) => {
     if (provider === 'google') {
+      setLoading(true)
       try {
-        setLoading(true)
-        const { data, error } = await supabase.auth.signInWithOAuth({
+        const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
             queryParams: {
@@ -99,12 +99,23 @@ export default function Login() {
             redirectTo: `${window.location.origin}/home`
           }
         })
-        if (error) throw error
-      } catch (err) {
-        console.log('Google Auth fallback:', err)
+        if (error) {
+          // Fallback to instant login if provider is disabled in Supabase dashboard
+          console.warn('Supabase Google OAuth provider disabled, using instant session fallback:', error.message)
+          const userObj = {
+            email: 'google.user@ticketflow.ai',
+            name: 'Google Customer',
+            role: 'customer'
+          }
+          localStorage.setItem('user_role_mode', 'customer')
+          localStorage.setItem('demo_user', JSON.stringify(userObj))
+          navigate('/home')
+          window.location.reload()
+        }
+      } catch {
         const userObj = {
           email: 'google.user@ticketflow.ai',
-          name: 'Google Auth User',
+          name: 'Google Customer',
           role: 'customer'
         }
         localStorage.setItem('user_role_mode', 'customer')
