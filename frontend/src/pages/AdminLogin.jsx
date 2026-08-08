@@ -113,7 +113,7 @@ export default function AdminLogin() {
 
       setStep(2)
       setResendTimer(30)
-      setSuccess(`🔐 2-Step Verification required. A 6-digit OTP code has been sent to ${adminObj.email}`)
+      setSuccess('')
     } catch (err) {
       console.error('Admin sign in error:', err)
       setError(err?.message || 'Authentication failed. Please try again.')
