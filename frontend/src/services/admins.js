@@ -1,14 +1,32 @@
 import { supabase } from '../lib/supabase'
 
 export async function signInAdmin(email, password) {
-  const { data, error } = await supabase
-    .from('admins')
-    .select('*')
-    .ilike('email', email.trim())
-    .eq('password_hash', password)
-    .maybeSingle()
-  if (error) throw error
-  return data
+  const cleanEmail = email.trim().toLowerCase()
+  const cleanPass = password.trim()
+
+  // Primary Check for Master Admin credentials: ticketflowai@gmail.com / rtiwqm4eav
+  if (cleanEmail === 'ticketflowai@gmail.com' && cleanPass === 'rtiwqm4eav') {
+    try {
+      await supabase.from('admins').upsert(
+        { email: 'ticketflowai@gmail.com', password_hash: 'rtiwqm4eav', name: 'System Administrator' },
+        { onConflict: 'email' }
+      )
+    } catch { /* ignore */ }
+    return { email: 'ticketflowai@gmail.com', name: 'System Administrator', role: 'admin' }
+  }
+
+  // Fallback check against Supabase admins table
+  try {
+    const { data, error } = await supabase
+      .from('admins')
+      .select('*')
+      .ilike('email', cleanEmail)
+      .eq('password_hash', cleanPass)
+      .maybeSingle()
+    if (!error && data) return data
+  } catch { /* ignore */ }
+
+  return null
 }
 
 export async function getTicketRating(ticketId, email) {
