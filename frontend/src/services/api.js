@@ -53,12 +53,34 @@ export function classifyTicketPriority(subject = '', description = '', category 
     return { priority: 'Critical', confidence_score: 95.8, reasoning: 'Matched critical infrastructure / emergency keywords.' }
   }
   if (/error|failure|failed|broken|sync|billing|payment|invoice|auth|token|cors|api/i.test(text)) {
-    return { priority: 'High', confidence_score: 89.2, reasoning: 'Matched high-impact operational / API / billing keywords.' }
+    return { priority: 'High', confidence_score: 78.5, reasoning: 'Matched high-impact operational / API / billing keywords.' }
   }
   if (/slow|latency|warning|delay|ui|ux|display|theme|dark mode|style|mobile/i.test(text)) {
-    return { priority: 'Medium', confidence_score: 84.5, reasoning: 'Matched medium-impact performance / UI keywords.' }
+    return { priority: 'Medium', confidence_score: 54.2, reasoning: 'Matched medium-impact performance / UI keywords.' }
   }
-  return { priority: 'Low', confidence_score: 78.0, reasoning: 'General query or feature request.' }
+  return { priority: 'Low', confidence_score: 28.0, reasoning: 'General query or feature request.' }
+}
+
+export function getSynchronizedPriorityAndScore(ticket) {
+  let score = Math.round(ticket?.score || ticket?.confidence_score || 0)
+  let priority = ticket?.priority || ticket?.ai_priority || ''
+
+  if (score > 0) {
+    if (score >= 80) priority = 'Critical'
+    else if (score >= 60) priority = 'High'
+    else if (score >= 40) priority = 'Medium'
+    else priority = 'Low'
+  } else if (priority) {
+    if (priority === 'Critical') score = 96
+    else if (priority === 'High') score = 78
+    else if (priority === 'Medium') score = 54
+    else score = 28
+  } else {
+    priority = 'Medium'
+    score = 54
+  }
+
+  return { priority, score }
 }
 
 // ── ImgBB Image Storage ───────────────────────────────────────────
@@ -251,11 +273,6 @@ export const createTicket = async (data) => {
     }
   } catch (err) {
     console.warn('Supabase ticket insert exception:', err?.message)
-  }
-
-  // 3. Attempt backend API post asynchronously without blocking response
-  if (BASE) {
-    api.post('/api/tickets/', data).catch(() => null)
   }
 
   // Return generated ticket INSTANTLY to caller

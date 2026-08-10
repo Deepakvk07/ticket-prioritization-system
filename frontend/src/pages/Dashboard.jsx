@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Ticket, CheckCircle, Clock, Plus, Filter, Download, ChevronRight, Sparkles, ArrowRight, ShieldCheck, UserCheck, UserPlus, User, Check, Layers, Headphones } from 'lucide-react'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
-import { getTickets, updateTicket } from '../services/api'
+import { getTickets, updateTicket, getSynchronizedPriorityAndScore } from '../services/api'
 import { getAgents, getMatchingAgentsForTicket } from '../services/agents'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { useTranslation } from '../lib/i18n'
@@ -374,8 +374,8 @@ export default function Dashboard({ user }) {
 
 function TicketRow({ t, navigate, registeredAgents, onAssignAgent, isAssigning }) {
   const sc = statusClass[t.status] || 'open'
-  const pc = priorityClass[t.priority] || 'medium'
-  const score = t.score || (t.priority === 'Critical' ? 96 : t.priority === 'High' ? 78 : t.priority === 'Medium' ? 54 : 28)
+  const { priority, score } = getSynchronizedPriorityAndScore(t)
+  const pc = priorityClass[priority] || 'medium'
   const assignedAgent = t.assigned_agent || ''
 
   // Filter ONLY registered agents matching this ticket's specific problem text
@@ -391,7 +391,7 @@ function TicketRow({ t, navigate, registeredAgents, onAssignAgent, isAssigning }
       {/* Priority Level */}
       <td>
         <span className={`badge badge-${pc}`} style={{ fontWeight: 800, fontSize: '0.76rem' }}>
-          ● {t.priority}
+          ● {priority}
         </span>
       </td>
 

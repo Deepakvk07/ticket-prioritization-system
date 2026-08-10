@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
-import { getTickets, updateTicket } from '../services/api'
+import { getTickets, updateTicket, getSynchronizedPriorityAndScore } from '../services/api'
 import { getAgents, getMatchingAgentsForTicket } from '../services/agents'
 import { supabase } from '../lib/supabase'
 import { Filter, ChevronRight, ShieldCheck, Layers, UserCheck, Download, Zap, Sparkles, CheckCircle2 } from 'lucide-react'
@@ -388,7 +388,7 @@ export default function TicketQueue({ user }) {
                       if (currentObj) optionsToDisplay.unshift(currentObj)
                     }
 
-                    const ticketScore = Math.round(t.score || t.confidence_score || (t.priority === 'Critical' ? 96 : t.priority === 'High' ? 78 : t.priority === 'Medium' ? 54 : 28))
+                    const { priority, score: ticketScore } = getSynchronizedPriorityAndScore(t)
                     const isSelected = selectedTickets.has(t.id)
 
                     return (
@@ -405,8 +405,8 @@ export default function TicketQueue({ user }) {
                         )}
                         {!isCustomer && (
                           <td>
-                            <span className={`badge badge-${priorityClass[t.priority] || 'low'}`} style={{ fontWeight: 800 }}>
-                              ● {t.priority}
+                            <span className={`badge badge-${priorityClass[priority] || 'low'}`} style={{ fontWeight: 800 }}>
+                              ● {priority}
                             </span>
                           </td>
                         )}
