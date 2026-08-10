@@ -195,81 +195,8 @@ export default function Dashboard({ user }) {
             </div>
           </div>
 
-          {/* Registered Agents by Category View Section */}
-          {isAdmin && (
-            <div style={{ marginBottom: 28 }}>
-              <div className="section-header" style={{ marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <span className="section-title" style={{ fontSize: '1.1rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                    <Headphones size={18} color="#2563eb" /> Registered Agent Roster by Category
-                  </span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: 10 }}>
-                    ({registeredAgents.length} registered agents)
-                  </span>
-                </div>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => navigate('/agent-login')}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                >
-                  <UserPlus size={14} /> Register New Agent
-                </button>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
-                {CATEGORIES_LIST.map(catItem => {
-                  // Filter agents belonging to this category
-                  const catAgents = registeredAgents.filter(a => (a.department || '').toLowerCase() === catItem.name.toLowerCase())
-                  const catTickets = tickets.filter(t => (t.category || t.product_module || '').toLowerCase().includes(catItem.name.toLowerCase()))
-
-                  return (
-                    <div
-                      key={catItem.name}
-                      className="card"
-                      style={{
-                        padding: 18,
-                        borderRadius: 14,
-                        background: 'var(--bg-card)',
-                        border: '1px solid var(--border)',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                        <span style={{ fontSize: '1.4rem' }}>{catItem.icon}</span>
-                        <span style={{
-                          fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 10,
-                          background: catAgents.length > 0 ? 'rgba(37,99,235,0.1)' : 'var(--bg-input)',
-                          color: catAgents.length > 0 ? '#2563eb' : 'var(--text-muted)'
-                        }}>
-                          {catAgents.length} agent{catAgents.length === 1 ? '' : 's'}
-                        </span>
-                      </div>
-
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {catItem.name}
-                      </div>
-
-                      {catAgents.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
-                          {catAgents.map(ag => (
-                            <div key={ag.email} style={{ fontSize: '0.76rem', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <UserCheck size={12} color="#059669" /> {ag.name}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 8 }}>
-                          No agent registered
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Executive Live Queue Summary & Workstream Portal Card */}
-          <div className="card" style={{ padding: '28px 32px', marginBottom: 24, background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)', border: '1px solid #e2e8f0', borderRadius: 16, boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)' }}>
+          <div className="card" style={{ padding: '28px 32px', marginBottom: 28, background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)', border: '1px solid #e2e8f0', borderRadius: 16, boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 16 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -387,6 +314,78 @@ export default function Dashboard({ user }) {
               </button>
             </div>
           </div>
+
+          {/* Registered Agents by Category View Section */}
+          {isAdmin && (
+            <div style={{ marginBottom: 28 }}>
+              <div className="section-header" style={{ marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span className="section-title" style={{ fontSize: '1.1rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <Headphones size={18} color="#2563eb" /> Registered Agent Roster by Category
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: 10 }}>
+                    ({registeredAgents.length} registered agents)
+                  </span>
+                </div>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => navigate('/agent-login')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <UserPlus size={14} /> Register New Agent
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
+                {CATEGORIES_LIST.map(catItem => {
+                  // Filter agents belonging to this category
+                  const catAgents = registeredAgents.filter(a => (a.department || '').toLowerCase() === catItem.name.toLowerCase())
+
+                  return (
+                    <div
+                      key={catItem.name}
+                      className="card"
+                      style={{
+                        padding: 18,
+                        borderRadius: 14,
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <span style={{ fontSize: '1.4rem' }}>{catItem.icon}</span>
+                        <span style={{
+                          fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                          background: catAgents.length > 0 ? 'rgba(37,99,235,0.1)' : 'var(--bg-input)',
+                          color: catAgents.length > 0 ? '#2563eb' : 'var(--text-muted)'
+                        }}>
+                          {catAgents.length} agent{catAgents.length === 1 ? '' : 's'}
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {catItem.name}
+                      </div>
+
+                      {catAgents.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+                          {catAgents.map(ag => (
+                            <div key={ag.email} style={{ fontSize: '0.76rem', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <UserCheck size={12} color="#059669" /> {ag.name}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 8 }}>
+                          No agent registered
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
         </div>
       </div>
