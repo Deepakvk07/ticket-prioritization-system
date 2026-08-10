@@ -4,7 +4,7 @@ import { Ticket, CheckCircle, Clock, Plus, Filter, Download, ChevronRight, Spark
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets, updateTicket } from '../services/api'
-import { getAgents } from '../services/agents'
+import { getAgents, getMatchingAgentsForTicket } from '../services/agents'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { useTranslation } from '../lib/i18n'
 
@@ -376,11 +376,15 @@ function TicketRow({ t, navigate, registeredAgents, onAssignAgent, isAssigning }
   const sc = statusClass[t.status] || 'open'
   const pc = priorityClass[t.priority] || 'medium'
   const score = t.score || (t.priority === 'Critical' ? 96 : t.priority === 'High' ? 78 : t.priority === 'Medium' ? 54 : 28)
-  const dept = t.category || t.product_module || 'Technical Support'
   const assignedAgent = t.assigned_agent || ''
 
-  // Filter ONLY registered agents matching this ticket's category
-  const categoryAgents = getAgentsForCategory(dept, registeredAgents)
+  // Filter ONLY registered agents matching this ticket's specific problem text
+  const matchingAgents = getMatchingAgentsForTicket(t, registeredAgents)
+  let categoryAgents = [...matchingAgents]
+  if (assignedAgent && !categoryAgents.some(a => a.name === assignedAgent)) {
+    const currentObj = registeredAgents.find(a => a.name === assignedAgent)
+    if (currentObj) categoryAgents.unshift(currentObj)
+  }
 
   return (
     <tr onClick={() => navigate(`/tickets/${t.id}`)} style={{ cursor: 'pointer' }}>

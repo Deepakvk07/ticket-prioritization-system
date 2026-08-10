@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets, updateTicket } from '../services/api'
-import { getAgents } from '../services/agents'
+import { getAgents, getMatchingAgentsForTicket } from '../services/agents'
 import { supabase } from '../lib/supabase'
 import { Filter, ChevronRight, ShieldCheck, Layers, UserCheck, Download, Zap, Sparkles, CheckCircle2 } from 'lucide-react'
 
@@ -130,7 +130,7 @@ export default function TicketQueue({ user }) {
     } catch {}
   }
 
-  // 1-Click Auto-Assign Engine
+  // 1-Click Problem-Based Auto-Assign Engine
   const handleAutoAssignAll = async () => {
     if (registeredAgents.length === 0) {
       alert('No agents registered in Supabase DB yet. Please register specialist agents first in Agent Management.')
@@ -148,17 +148,9 @@ export default function TicketQueue({ user }) {
 
     for (let i = 0; i < unassignedList.length; i++) {
       const t = unassignedList[i]
-      const cat = (t.category || t.product_module || '').toLowerCase()
-      const deptMatch = registeredAgents.filter(a => {
-        const d = (a.department || '').toLowerCase()
-        if (cat.includes('database') || cat.includes('infra')) return d.includes('database')
-        if (cat.includes('web') || cat.includes('ui') || cat.includes('ux')) return d.includes('web')
-        if (cat.includes('billing') || cat.includes('payment')) return d.includes('billing')
-        if (cat.includes('api') || cat.includes('security')) return d.includes('api')
-        return d.includes('support') || d === cat
-      })
+      const matchingAgents = getMatchingAgentsForTicket(t, registeredAgents)
+      const targetAgent = matchingAgents[i % matchingAgents.length] || registeredAgents[0]
 
-      const targetAgent = (deptMatch.length > 0 ? deptMatch : registeredAgents)[i % (deptMatch.length || registeredAgents.length)]
       if (targetAgent) {
         await updateTicket(t.id, {
           assigned_agent: targetAgent.name,
@@ -173,7 +165,7 @@ export default function TicketQueue({ user }) {
     const updated = await getTickets()
     setTickets(Array.isArray(updated) ? updated : [])
     setAutoAssigning(false)
-    setAssignSuccessMsg(`⚡ Auto-assigned ${count} ticket(s) to specialist agents!`)
+    setAssignSuccessMsg(`⚡ Auto-assigned ${count} ticket(s) to matching specialist agents!`)
     setTimeout(() => setAssignSuccessMsg(''), 4500)
   }
 
@@ -389,19 +381,13 @@ export default function TicketQueue({ user }) {
                   )}
                   {sorted.map(t => {
                     const assignedAgent = t.assigned_agent || ''
-                    // Filter ONLY agents registered by the user
-                    const categoryAgents = registeredAgents.filter(agent => {
-                      const cat = (t.category || t.product_module || '').toLowerCase()
-                      const dept = (agent.department || '').toLowerCase()
-                      if (cat.includes('database') || cat.includes('infra')) return dept.includes('database')
-                      if (cat.includes('web') || cat.includes('ui') || cat.includes('ux') || cat.includes('frontend')) return dept.includes('web')
-                      if (cat.includes('billing') || cat.includes('payment') || cat.includes('integration')) return dept.includes('billing')
-                      if (cat.includes('api') || cat.includes('security')) return dept.includes('api')
-                      if (cat.includes('support') || cat.includes('technical')) return dept.includes('support')
-                      return dept === cat || dept.includes(cat) || cat.includes(dept)
-                    })
-
-                    const optionsToDisplay = categoryAgents.length > 0 ? categoryAgents : registeredAgents
+                    // Strict filtering: ONLY show agents matching the specific problem text
+                    const matchingAgents = getMatchingAgentsForTicket(t, registeredAgents)
+                    let optionsToDisplay = [...matchingAgents]
+                    if (assignedAgent && !optionsToDisplay.some(a => a.name === assignedAgent)) {
+                      const currentObj = registeredAgents.find(a => a.name === assignedAgent)
+                      if (currentObj) optionsToDisplay.unshift(currentObj)
+                    }
 
                     const ticketScore = Math.round(t.score || t.confidence_score || (t.priority === 'Critical' ? 96 : t.priority === 'High' ? 78 : t.priority === 'Medium' ? 54 : 28))
                     const isSelected = selectedTickets.has(t.id)
