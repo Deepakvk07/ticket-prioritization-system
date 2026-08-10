@@ -195,123 +195,74 @@ export default function Dashboard({ user }) {
             </div>
           </div>
 
-          {/* Executive Live Queue Summary & Workstream Portal Card */}
-          <div className="card" style={{ padding: '28px 32px', marginBottom: 28, background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)', border: '1px solid #e2e8f0', borderRadius: 16, boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 16 }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          {/* Executive Live Queue Summary & Workstream Portal Section (Clean & Unboxed) */}
+          <div style={{ marginBottom: 28, padding: '16px 4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20 }}>
+              <div style={{ maxWidth: 720 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                   <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
                     <Ticket size={18} />
                   </div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
                     AI Priority Ordered Ticket Stream
                   </h3>
                 </div>
-                <p style={{ fontSize: '0.86rem', color: '#64748b', margin: 0 }}>
-                  Real-time NLP Triage, SLA Enforcement & Specialist Agent Routing Workspace
+                <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
+                  All incoming tickets are automatically processed by the AI Triage Engine, prioritized by urgency score (Critical → High → Medium → Low), and routed to domain specialists. Open the full Ticket Queue workspace to manage active tickets, perform 1-click auto-assignments, or reassign support agents.
                 </p>
               </div>
 
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  if (!sortedTickets || sortedTickets.length === 0) {
-                    alert('No tickets available to export.')
-                    return
-                  }
-                  const headers = ['Ticket ID', 'Subject', 'Category', 'Priority', 'AI Score', 'Status', 'Assigned Agent', 'Customer Name', 'Customer Email', 'Created Date']
-                  const csvRows = [
-                    headers.join(','),
-                    ...sortedTickets.map(t => [
-                      `"${t.code || t.id || ''}"`,
-                      `"${(t.subject || '').replace(/"/g, '""')}"`,
-                      `"${(t.category || t.product_module || '').replace(/"/g, '""')}"`,
-                      `"${t.priority || ''}"`,
-                      `"${t.score || t.confidence_score || 50}"`,
-                      `"${t.status || ''}"`,
-                      `"${(t.assigned_agent || 'Unassigned').replace(/"/g, '""')}"`,
-                      `"${(t.customer_name || '').replace(/"/g, '""')}"`,
-                      `"${(t.customer_email || '').replace(/"/g, '""')}"`,
-                      `"${t.created_at ? new Date(t.created_at).toLocaleString() : ''}"`
-                    ].join(','))
-                  ]
-                  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })
-                  const url = URL.createObjectURL(blob)
-                  const link = document.createElement('a')
-                  link.href = url
-                  link.setAttribute('download', `ticketflow_admin_export_${new Date().toISOString().slice(0, 10)}.csv`)
-                  document.body.appendChild(link)
-                  link.click()
-                  document.body.removeChild(link)
-                }}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              >
-                <Download size={14} /> {t('export_csv')}
-              </button>
-            </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    if (!sortedTickets || sortedTickets.length === 0) {
+                      alert('No tickets available to export.')
+                      return
+                    }
+                    const headers = ['Ticket ID', 'Subject', 'Category', 'Priority', 'AI Score', 'Status', 'Assigned Agent', 'Customer Name', 'Customer Email', 'Created Date']
+                    const csvRows = [
+                      headers.join(','),
+                      ...sortedTickets.map(t => [
+                        `"${t.code || t.id || ''}"`,
+                        `"${(t.subject || '').replace(/"/g, '""')}"`,
+                        `"${(t.category || t.product_module || '').replace(/"/g, '""')}"`,
+                        `"${t.priority || ''}"`,
+                        `"${t.score || t.confidence_score || 50}"`,
+                        `"${t.status || ''}"`,
+                        `"${(t.assigned_agent || 'Unassigned').replace(/"/g, '""')}"`,
+                        `"${(t.customer_name || '').replace(/"/g, '""')}"`,
+                        `"${(t.customer_email || '').replace(/"/g, '""')}"`,
+                        `"${t.created_at ? new Date(t.created_at).toLocaleString() : ''}"`
+                      ].join(','))
+                    ]
+                    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })
+                    const url = URL.createObjectURL(blob)
+                    const link = document.createElement('a')
+                    link.href = url
+                    link.setAttribute('download', `ticketflow_admin_export_${new Date().toISOString().slice(0, 10)}.csv`)
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 16px' }}
+                >
+                  <Download size={15} /> {t('export_csv')}
+                </button>
 
-            {/* Live Queue Health Breakdown Pill Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
-              <div style={{ padding: '16px 20px', borderRadius: 12, background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  🔴 Critical Priority
-                </div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#991b1b', marginTop: 4 }}>
-                  {sortedTickets.filter(t => t.priority === 'Critical').length} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Tickets</span>
-                </div>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => navigate('/tickets')}
+                  style={{
+                    padding: '11px 22px', fontSize: '0.9rem', fontWeight: 800,
+                    borderRadius: 10, display: 'inline-flex', alignItems: 'center', gap: 8,
+                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)', flexShrink: 0
+                  }}
+                >
+                  <span>View Full Ticket Queue Workspace</span>
+                  <ArrowRight size={16} />
+                </button>
               </div>
-
-              <div style={{ padding: '16px 20px', borderRadius: 12, background: 'rgba(245, 158, 11, 0.06)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-                <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  🟠 High Priority
-                </div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#b45309', marginTop: 4 }}>
-                  {sortedTickets.filter(t => t.priority === 'High').length} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Tickets</span>
-                </div>
-              </div>
-
-              <div style={{ padding: '16px 20px', borderRadius: 12, background: 'rgba(59, 130, 246, 0.06)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-                <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  🔵 Medium Priority
-                </div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#1d4ed8', marginTop: 4 }}>
-                  {sortedTickets.filter(t => t.priority === 'Medium').length} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Tickets</span>
-                </div>
-              </div>
-
-              <div style={{ padding: '16px 20px', borderRadius: 12, background: 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  🟢 Low Priority
-                </div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#047857', marginTop: 4 }}>
-                  {sortedTickets.filter(t => t.priority === 'Low').length} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Tickets</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Description & Action Callout */}
-            <div style={{ background: '#f1f5f9', padding: '18px 24px', borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-              <div style={{ maxWidth: 620 }}>
-                <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
-                  📋 Dedicated Ticket Queue Workspace
-                </div>
-                <div style={{ fontSize: '0.84rem', color: '#64748b', lineHeight: 1.5 }}>
-                  All incoming tickets are automatically processed by the AI Triage Engine, prioritized by urgency score, and routed to domain specialists. Open the full Ticket Queue workspace to manage active tickets, perform 1-click auto-assignments, or reassign support agents.
-                </div>
-              </div>
-
-              <button
-                className="btn btn-primary"
-                onClick={() => navigate('/tickets')}
-                style={{
-                  padding: '12px 24px', fontSize: '0.92rem', fontWeight: 800,
-                  borderRadius: 10, display: 'inline-flex', alignItems: 'center', gap: 8,
-                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)', flexShrink: 0
-                }}
-              >
-                <span>View Full Ticket Queue Workspace</span>
-                <ArrowRight size={16} />
-              </button>
             </div>
           </div>
 
