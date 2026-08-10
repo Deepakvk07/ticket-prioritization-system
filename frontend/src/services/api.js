@@ -129,6 +129,9 @@ export const getTickets = async (params = {}) => {
         const code = t.ticket_code || t.code || `TK-${(t.id || '').substring(0, 5).toUpperCase()}`
         return { ...t, code, ticket_code: code }
       })
+      if (data.length === 0) {
+        try { localStorage.removeItem(LOCAL_TICKETS_KEY) } catch {}
+      }
     }
   } catch { /* fallback */ }
 
@@ -277,6 +280,14 @@ export const createTicket = async (data) => {
 
   // Return generated ticket INSTANTLY to caller
   return newTicket
+}
+
+export const clearAllTickets = async () => {
+  try { localStorage.removeItem(LOCAL_TICKETS_KEY) } catch {}
+  try {
+    await supabase.from('tickets').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+  } catch {}
+  return true
 }
 
 export const updateTicket = async (id, updates) => {
