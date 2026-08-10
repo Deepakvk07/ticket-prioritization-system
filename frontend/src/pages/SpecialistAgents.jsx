@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets } from '../services/api'
-import { getAgents, removeAgent } from '../services/agents'
-import { Headphones, Mail, Layers, UserPlus, Trash2, Calendar } from 'lucide-react'
-
+import { getAgents, removeAgent, getDirectMessages, sendDirectMessage } from '../services/agents'
+import { Headphones, Mail, Layers, UserPlus, Trash2, Calendar, MessageSquare, Send, X, RefreshCw, Paperclip } from 'lucide-react'
 
 const DEPT_COLORS = {
   'Database & Infrastructure': { bg: 'rgba(99,102,241,0.1)', color: '#6366f1', icon: '🗄️' },
@@ -25,6 +24,15 @@ export default function SpecialistAgents({ user }) {
   const [registeredAgents, setRegisteredAgents] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Real Chat State
+  const [activeChatAgent, setActiveChatAgent] = useState(null)
+  const [chatMessages, setChatMessages] = useState([])
+  const [inputMsg, setInputMsg] = useState('')
+  const [sending, setSending] = useState(false)
+  const chatEndRef = useRef(null)
+
+  const adminEmail = user?.email || 'admin@ticketflow.ai'
+
   useEffect(() => {
     // Load agents from Supabase
     getAgents()
@@ -36,6 +44,105 @@ export default function SpecialistAgents({ user }) {
       .then(res => setTickets(Array.isArray(res) ? res : []))
       .catch(() => setTickets([]))
   }, [])
+
+  // Poll for real incoming messages every 2 seconds when chat is open
+  useEffect(() => {
+    if (!activeChatAgent) return
+    let isMounted = true
+
+    const loadRealMessages = async () => {
+      try {
+        const msgs = await getDirectMessages(adminEmail, activeChatAgent.email)
+        if (isMounted) {
+          setChatMessages(msgs)
+        }
+      } catch { /* ignore */ }
+    }
+
+    loadRealMessages()
+    const interval = setInterval(loadRealMessages, 2000)
+
+    return () => {
+      isMounted = false
+      clearInterval(interval)
+    }
+  }, [activeChatAgent, adminEmail])
+
+  // Auto-scroll to bottom of chat
+  useEffect(() => {
+    if (activeChatAgent) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [chatMessages, activeChatAgent])
+
+  const openChatWithAgent = async (agent) => {
+    setActiveChatAgent(agent)
+    try {
+      const msgs = await getDirectMessages(adminEmail, agent.email)
+      setChatMessages(msgs)
+    } catch {
+      setChatMessages([])
+    }
+  }
+
+  const closeChat = () => {
+    setActiveChatAgent(null)
+    setChatMessages([])
+    setInputMsg('')
+  }
+
+  const [adminChatFile, setAdminChatFile] = useState(null)
+  const adminFileInputRef = useRef(null)
+
+  const handleAdminChatFileSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      setAdminChatFile({
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        size: (file.size / 1024).toFixed(1) + ' KB',
+        url: evt.target?.result
+      })
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault()
+    if ((!inputMsg.trim() && !adminChatFile) || !activeChatAgent || sending) return
+
+    const textToSend = inputMsg.trim()
+    const fileToSend = adminChatFile
+    setInputMsg('')
+    setAdminChatFile(null)
+    setSending(true)
+
+    try {
+      const sentMsg = await sendDirectMessage({
+        senderEmail: adminEmail,
+        senderName: 'Administrator',
+        receiverEmail: activeChatAgent.email,
+        text: textToSend,
+        fileAttachment: fileToSend
+      })
+      setChatMessages(prev => [...prev, sentMsg])
+    } catch (err) {
+      console.error('Failed to send message:', err)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const clearChatHistory = () => {
+    if (!activeChatAgent) return
+    const pairKey = [adminEmail.toLowerCase(), activeChatAgent.email.toLowerCase()].sort().join('__')
+    try {
+      localStorage.removeItem(`tf_pair_chat_${pairKey}`)
+    } catch { /* ignore */ }
+    setChatMessages([])
+  }
 
   const handleRemoveAgent = async (email) => {
     try {
@@ -64,9 +171,9 @@ export default function SpecialistAgents({ user }) {
           <div className="page-header" style={{ marginBottom: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h2 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Headphones size={22} color="var(--accent)" /> Agent Management
+                <Headphones size={22} color="var(--accent)" /> Agent Management & Direct Chat
               </h2>
-              <p>All registered support agents and their assigned departments.</p>
+              <p>All registered support agents, specialist departments, and direct real-time communication portal.</p>
             </div>
             <button
               className="btn btn-primary btn-sm"
@@ -96,7 +203,7 @@ export default function SpecialistAgents({ user }) {
           {registeredAgents.length > 0 && (
             <div className="card" style={{ padding: 20, marginBottom: 28, borderRadius: 16 }}>
               <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-                🏆 Agent Performance Leaderboard
+                🏆 Agent Performance & Communication Roster
               </div>
               <div className="table-container">
                 <table className="data-table">
@@ -108,6 +215,7 @@ export default function SpecialistAgents({ user }) {
                       <th>Assigned</th>
                       <th>Avg CSAT</th>
                       <th>SLA Rate</th>
+                      <th>Direct Communication</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -126,6 +234,15 @@ export default function SpecialistAgents({ user }) {
                           <td style={{ fontWeight: 700 }}>{count} tickets</td>
                           <td style={{ color: '#f59e0b', fontWeight: 700 }}>⭐ {(4.7 + (i * 0.1)).toFixed(1)} / 5.0</td>
                           <td style={{ color: '#10b981', fontWeight: 700 }}>98.4%</td>
+                          <td>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => openChatWithAgent(agent)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 700, background: 'rgba(37,99,235,0.08)', color: '#2563eb', border: '1px solid rgba(37,99,235,0.2)' }}
+                            >
+                              <MessageSquare size={13} /> Chat with Agent
+                            </button>
+                          </td>
                         </tr>
                       )
                     })}
@@ -221,18 +338,231 @@ export default function SpecialistAgents({ user }) {
                       </span>
                     </div>
 
-                    {/* Stats Row */}
-                    <div style={{ display: 'flex', gap: 10, fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Layers size={12} /> {ticketCount} tickets
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Calendar size={12} /> Joined {joinedDate}
-                      </span>
+                    {/* Stats & Action Row */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
+                      <div style={{ display: 'flex', gap: 10, fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Layers size={12} /> {ticketCount} tickets
+                        </span>
+                      </div>
+
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => openChatWithAgent(agent)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', fontSize: '0.78rem', fontWeight: 700 }}
+                      >
+                        <MessageSquare size={13} /> Chat Direct
+                      </button>
                     </div>
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {/* 💬 Direct Agent Communication Chat Modal Drawer */}
+          {activeChatAgent && (
+            <div style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(6px)',
+              zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 20
+            }}>
+              <div style={{
+                width: '100%', maxWidth: 540, height: 620, background: '#ffffff',
+                borderRadius: 20, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                border: '1px solid #e2e8f0'
+              }}>
+                {/* Chat Header */}
+                <div style={{
+                  padding: '16px 20px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                  color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  borderBottom: '1px solid rgba(255,255,255,0.1)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                      width: 42, height: 42, borderRadius: '50%', background: '#2563eb',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontWeight: 800, fontSize: '0.95rem', color: '#fff', position: 'relative'
+                    }}>
+                      {activeChatAgent.name.slice(0, 2).toUpperCase()}
+                      <span style={{
+                        position: 'absolute', bottom: 0, right: 0, width: 10, height: 10,
+                        borderRadius: '50%', background: '#10b981', border: '2px solid #0f172a'
+                      }} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {activeChatAgent.name}
+                        <span style={{ fontSize: '0.7rem', padding: '2px 7px', borderRadius: 10, background: 'rgba(16,185,129,0.2)', color: '#34d399', fontWeight: 700 }}>
+                          🟢 Active Specialist
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
+                        {activeChatAgent.department} &bull; {activeChatAgent.email}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button
+                      onClick={clearChatHistory}
+                      title="Clear Chat History"
+                      style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#cbd5e1', cursor: 'pointer', padding: 6, borderRadius: 8, display: 'flex' }}
+                    >
+                      <RefreshCw size={15} />
+                    </button>
+                    <button
+                      onClick={closeChat}
+                      style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', cursor: 'pointer', padding: 6, borderRadius: 8, display: 'flex' }}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Chat Messages Body */}
+                <div style={{
+                  flex: 1, padding: 20, overflowY: 'auto', background: '#f8fafc',
+                  display: 'flex', flexDirection: 'column', gap: 14
+                }}>
+                  <div style={{ textAlign: 'center', margin: '8px 0 16px' }}>
+                    <span style={{ fontSize: '0.72rem', background: '#e2e8f0', color: '#64748b', padding: '4px 12px', borderRadius: 12, fontWeight: 600 }}>
+                      🔒 Direct Encrypted Agent Channel
+                    </span>
+                  </div>
+
+                  {chatMessages.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
+                      <div style={{ fontSize: '2rem', marginBottom: 8 }}>💬</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#64748b', marginBottom: 4 }}>
+                        Direct channel with {activeChatAgent.name}
+                      </div>
+                      <div style={{ fontSize: '0.78rem' }}>
+                        Send a message below to start real-time 2-way conversation.
+                      </div>
+                    </div>
+                  ) : (
+                    chatMessages.map(msg => {
+                      const isMe = msg.sender_email?.toLowerCase() === adminEmail.toLowerCase()
+                      const senderLabel = isMe ? 'You' : (msg.sender_name || activeChatAgent.name)
+                      const timeStr = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+
+                      return (
+                        <div
+                          key={msg.id}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: isMe ? 'flex-end' : 'flex-start'
+                          }}
+                        >
+                          <div style={{
+                            maxWidth: '82%', padding: '12px 16px', borderRadius: 16,
+                            borderBottomRightRadius: isMe ? 4 : 16,
+                            borderBottomLeftRadius: !isMe ? 4 : 16,
+                            background: isMe ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : '#ffffff',
+                            color: isMe ? '#ffffff' : '#0f172a',
+                            border: isMe ? 'none' : '1px solid #e2e8f0',
+                            boxShadow: isMe ? '0 4px 12px rgba(37,99,235,0.2)' : '0 2px 6px rgba(0,0,0,0.03)',
+                            fontSize: '0.88rem', lineHeight: 1.5
+                          }}>
+                            {msg.text && <div>{msg.text}</div>}
+                            {msg.file_attachment && (
+                              <div style={{ marginTop: msg.text ? 8 : 0 }}>
+                                {msg.file_attachment.type?.startsWith('image/') ? (
+                                  <img
+                                    src={msg.file_attachment.url}
+                                    alt={msg.file_attachment.name}
+                                    style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, marginTop: 4 }}
+                                  />
+                                ) : (
+                                  <a
+                                    href={msg.file_attachment.url}
+                                    download={msg.file_attachment.name}
+                                    style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+                                      background: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)', borderRadius: 8, color: 'inherit',
+                                      fontSize: '0.78rem', textDecoration: 'none', fontWeight: 600, marginTop: 4
+                                    }}
+                                  >
+                                    <Paperclip size={14} /> {msg.file_attachment.name} ({msg.file_attachment.size})
+                                  </a>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: 4, padding: '0 4px', fontWeight: 500 }}>
+                            {senderLabel} &bull; {timeStr}
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Selected File Chip */}
+                {adminChatFile && (
+                  <div style={{ padding: '8px 16px', background: 'rgba(37,99,235,0.08)', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#2563eb', fontWeight: 600 }}>
+                      <Paperclip size={14} /> Attached: {adminChatFile.name} ({adminChatFile.size})
+                    </div>
+                    <button type="button" onClick={() => setAdminChatFile(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 700 }}>✕ Remove</button>
+                  </div>
+                )}
+
+                {/* Chat Input Footer */}
+                <form
+                  onSubmit={handleSendMessage}
+                  style={{
+                    padding: '14px 16px', background: '#ffffff', borderTop: '1px solid #e2e8f0',
+                    display: 'flex', alignItems: 'center', gap: 10
+                  }}
+                >
+                  <label
+                    title="Import/Attach File or Image"
+                    style={{
+                      cursor: 'pointer', padding: '8px 10px', borderRadius: 10, background: '#f8fafc',
+                      border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b'
+                    }}
+                  >
+                    <Paperclip size={18} />
+                    <input
+                      type="file"
+                      ref={adminFileInputRef}
+                      onChange={handleAdminChatFileSelect}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder={`Message ${activeChatAgent.name}...`}
+                    value={inputMsg}
+                    onChange={e => setInputMsg(e.target.value)}
+                    style={{
+                      flex: 1, padding: '10px 14px', borderRadius: 10, fontSize: '0.88rem',
+                      border: '1px solid #cbd5e1', background: '#f8fafc'
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={(!inputMsg.trim() && !adminChatFile) || sending}
+                    style={{
+                      padding: '10px 18px', borderRadius: 10, display: 'inline-flex',
+                      alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.86rem'
+                    }}
+                  >
+                    <span>{sending ? 'Sending…' : 'Send'}</span>
+                    <Send size={14} />
+                  </button>
+                </form>
+              </div>
             </div>
           )}
         </div>

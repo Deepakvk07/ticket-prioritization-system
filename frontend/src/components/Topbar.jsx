@@ -74,8 +74,14 @@ export default function Topbar({ user, placeholder }) {
 
   useEffect(() => {
     const handler = (e) => { if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifs(false) }
+    const handleStorage = () => { setNotifications(getNotifications()) }
+    
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      window.removeEventListener('storage', handleStorage)
+    }
   }, [])
 
   const markAllRead = () => {
@@ -121,6 +127,28 @@ export default function Topbar({ user, placeholder }) {
     return <AlertCircle size={14} color="#f59e0b" />
   }
 
+  const handleLogoClick = () => {
+    if (activeRole === 'admin') {
+      if (location.pathname === '/dashboard') {
+        window.location.reload()
+      } else {
+        navigate('/dashboard')
+      }
+    } else if (activeRole === 'agent') {
+      if (location.pathname === '/tickets') {
+        window.location.reload()
+      } else {
+        navigate('/tickets')
+      }
+    } else {
+      if (location.pathname === '/home') {
+        window.location.reload()
+      } else {
+        navigate('/home')
+      }
+    }
+  }
+
   return (
     <header className="topbar" style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -129,7 +157,7 @@ export default function Topbar({ user, placeholder }) {
     }}>
       {/* Brand & Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-        <div onClick={() => navigate('/home')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+        <div onClick={handleLogoClick} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
           <div style={{
             width: 32, height: 32, borderRadius: 9,
             background: 'linear-gradient(135deg, #2563eb, #4f46e5)',

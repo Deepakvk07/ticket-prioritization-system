@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets } from '../services/api'
+import { useTranslation } from '../lib/i18n'
 import { Clock, ChevronRight, Search, CalendarDays, CheckCircle2, XCircle, Layers, Filter, Download } from 'lucide-react'
 
 const priorityClass = { Critical: 'critical', High: 'high', Medium: 'medium', Low: 'low' }
@@ -159,8 +160,8 @@ export default function TicketHistory({ user }) {
           `}</style>
 
           <div className="page-header" style={{ marginBottom: 20 }}>
-            <h2>Ticket History</h2>
-            <p>Resolved and closed tickets — your completed work log and resolution archive.</p>
+            <h2>{t('ticket_history_title')}</h2>
+            <p>{t('ticket_history_sub')}</p>
           </div>
 
           {/* Stats Row */}

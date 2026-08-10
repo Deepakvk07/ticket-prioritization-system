@@ -4,7 +4,8 @@ import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTicket, addActivity, updateTicket, uploadToImgBB } from '../services/api'
 import { getTicketRating, saveTicketRating } from '../services/admins'
-import { ChevronRight, Paperclip, Send, ArrowLeft, X, Eye, FileText, Image as ImageIcon, Download, Star, RotateCcw, FileDown, CheckCircle2, Clock, AlertCircle, Loader, Sparkles } from 'lucide-react'
+import { getDirectMessages, sendDirectMessage } from '../services/agents'
+import { ChevronRight, Paperclip, Send, ArrowLeft, X, Eye, FileText, Image as ImageIcon, Download, Star, RotateCcw, FileDown, CheckCircle2, Clock, AlertCircle, Loader, Sparkles, MessageSquare, RefreshCw } from 'lucide-react'
 
 export default function TicketDetail({ user }) {
   const { id } = useParams()
@@ -24,6 +25,109 @@ export default function TicketDetail({ user }) {
   const [collisionAgent, setCollisionAgent] = useState(null)
   const [toastMsg, setToastMsg] = useState(null)
   const replyFileRef = useRef(null)
+
+  // Embedded Live 2-Way Chat State
+  const [directChatMsgs, setDirectChatMsgs] = useState([])
+  const [directChatInput, setDirectChatInput] = useState('')
+  const [directChatSending, setDirectChatSending] = useState(false)
+  const [chatFile, setChatFile] = useState(null)
+  const chatFileInputRef = useRef(null)
+  const directChatEndRef = useRef(null)
+
+  const handleChatFileSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      setChatFile({
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        size: (file.size / 1024).toFixed(1) + ' KB',
+        url: evt.target?.result
+      })
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const customerEmail = (user?.email || ticket?.customer_email || 'customer@gmail.com').toLowerCase()
+  const customerName = user?.user_metadata?.full_name || ticket?.customer_name || 'Customer'
+  const agentTargetEmail = (ticket?.assigned_agent_email || 'support@ticketflow.ai').toLowerCase()
+
+  // Poll for real incoming agent messages every 2 seconds
+  useEffect(() => {
+    if (!id || !agentTargetEmail) return
+    let isMounted = true
+
+    const loadLiveMessages = async () => {
+      try {
+        const msgs = await getDirectMessages(customerEmail, agentTargetEmail)
+        if (isMounted) {
+          setDirectChatMsgs(msgs)
+        }
+      } catch { /* ignore */ }
+    }
+
+    loadLiveMessages()
+    const interval = setInterval(loadLiveMessages, 2000)
+
+    return () => {
+      isMounted = false
+      clearInterval(interval)
+    }
+  }, [id, customerEmail, agentTargetEmail])
+
+  useEffect(() => {
+    directChatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [directChatMsgs])
+
+  const handleSendDirectChat = async (e) => {
+    if (e) e.preventDefault()
+    if ((!directChatInput.trim() && !chatFile) || directChatSending) return
+
+    const textToSend = directChatInput.trim()
+    const fileToSend = chatFile
+    setDirectChatInput('')
+    setChatFile(null)
+    setDirectChatSending(true)
+
+    try {
+      const sentMsg = await sendDirectMessage({
+        senderEmail: customerEmail,
+        senderName: customerName,
+        receiverEmail: agentTargetEmail,
+        text: textToSend,
+        fileAttachment: fileToSend
+      })
+
+      setDirectChatMsgs(prev => [...prev, sentMsg])
+      const updated = await getTicket(id).catch(() => null)
+      if (updated) setTicket(updated)
+    } catch (err) {
+      console.error('Failed to send direct message:', err)
+    } finally {
+      setDirectChatSending(false)
+    }
+  }
+
+  const handleMarkSolvedInChat = async () => {
+    setDirectChatSending(true)
+    try {
+      await handleStatusChange('Resolved')
+      const agentNameStr = user?.user_metadata?.full_name || user?.name || user?.email || 'Support Agent'
+      const solveMsg = await sendDirectMessage({
+        senderEmail: isStaff ? (user?.email || 'agent@ticketflow.ai') : customerEmail,
+        senderName: agentNameStr,
+        receiverEmail: isStaff ? customerEmail : agentTargetEmail,
+        text: `✅ Ticket #${id?.slice(0, 8)?.toUpperCase() || ''} has been marked as SOLVED & RESOLVED by ${agentNameStr}.`
+      })
+      setDirectChatMsgs(prev => [...prev, solveMsg])
+      setTicket(t => ({ ...t, status: 'Resolved' }))
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setDirectChatSending(false)
+    }
+  }
 
   // 1. Initial Ticket Load
   useEffect(() => {
@@ -554,38 +658,8 @@ export default function TicketDetail({ user }) {
             )}
           </div>
 
-          {/* Activity Messages Timeline */}
+          {/* Activity Messages Timeline Container */}
           <div style={{ marginBottom: 24 }}>
-            <div className="section-title" style={{ marginBottom: 14, fontSize: '1.05rem', fontWeight: 700 }}>
-              Conversation Timeline
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 18 }}>
-              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />TICKETS ACTIVITY<div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            </div>
-
-            {messagesOnly.map(act => (
-              <div key={act.id} style={{ marginBottom: 16, display: 'flex', gap: 12 }}>
-                <div style={{
-                  width: 34, height: 34, borderRadius: '50%',
-                  background: act.author_role === 'AGENT' ? 'linear-gradient(135deg, #3b82f6, #6366f1)' : 'linear-gradient(135deg, #10b981, #059669)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '0.75rem', fontWeight: 700, color: 'white', flexShrink: 0
-                }}>
-                  {typeof act.author === 'string' && act.author.trim() ? act.author.trim().split(/\s+/).map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'CU'}
-                </div>
-                <div className="card" style={{ flex: 1, padding: 18, background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{act.author}</span>
-                    {act.author_role && <span className="badge badge-medium" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>{act.author_role}</span>}
-                    <span style={{ marginLeft: 'auto', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                      {new Date(act.created_at).toLocaleString()}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>{act.content}</p>
-                </div>
-              </div>
-            ))}
 
             {/* Agent Resolution Controls & Canned Templates — Only for Staff/Agents */}
             {isStaff ? (
@@ -725,22 +799,186 @@ export default function TicketDetail({ user }) {
                 </div>
               </div>
             ) : (
-              <div className="card" style={{ padding: 20, marginTop: 20 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.92rem', marginBottom: 12, color: 'var(--text-primary)' }}>
-                  Write a reply to support
+              <div className="card" style={{ padding: 0, marginTop: 24, borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                {/* Embedded Chat Header */}
+                <div style={{
+                  padding: '14px 20px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                  color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: '50%', background: '#2563eb',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontWeight: 800, fontSize: '0.85rem', color: '#fff'
+                    }}>
+                      {(t.assigned_agent || 'AG').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        💬 Direct Live Chat with Agent ({t.assigned_agent || 'Support Specialist'})
+                        <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: 10, background: 'rgba(16,185,129,0.2)', color: '#34d399', fontWeight: 700 }}>
+                          🟢 Active
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                        {t.assigned_department || 'Technical Support'} &bull; Real-time 2-way channel
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Solved / Resolved Action Button for Agents */}
+                  {isStaff && t.status !== 'Resolved' && t.status !== 'Closed' && (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#ffffff', border: 'none', fontWeight: 700, padding: '6px 14px', borderRadius: 8, fontSize: '0.8rem' }}
+                      onClick={handleMarkSolvedInChat}
+                    >
+                      ✓ Mark Ticket Solved
+                    </button>
+                  )}
                 </div>
-                <textarea
-                  className="form-textarea"
-                  style={{ minHeight: 90, marginBottom: 10, fontSize: '0.92rem' }}
-                  placeholder="Type your message or update for the support team..."
-                  value={reply}
-                  onChange={e => setReply(e.target.value)}
-                />
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button className="btn btn-primary" disabled={!reply.trim() || sending} onClick={handleSend} style={{ padding: '10px 24px', fontWeight: 700 }}>
-                    <Send size={15} /> {sending ? 'Sending…' : 'Send Message'}
+
+                {/* Embedded Chat Messages Body */}
+                <div style={{
+                  maxHeight: 360, minHeight: 200, padding: 20, overflowY: 'auto', background: 'var(--bg-card-hover)',
+                  display: 'flex', flexDirection: 'column', gap: 12
+                }}>
+                  <div style={{ textAlign: 'center', margin: '4px 0 10px' }}>
+                    <span style={{ fontSize: '0.7rem', background: 'var(--bg-surface)', color: 'var(--text-muted)', padding: '3px 10px', borderRadius: 10, fontWeight: 600 }}>
+                      🔒 Direct Encrypted Agent Channel
+                    </span>
+                  </div>
+
+                  {directChatMsgs.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-muted)' }}>
+                      <MessageSquare size={24} style={{ margin: '0 auto 6px', opacity: 0.6 }} />
+                      <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                        Start a direct conversation with {t.assigned_agent || 'Support Agent'}
+                      </div>
+                      <div style={{ fontSize: '0.74rem' }}>
+                        Type your message below. Messages are synced instantly.
+                      </div>
+                    </div>
+                  ) : (
+                    directChatMsgs.map(msg => {
+                      const isMe = msg.sender_email?.toLowerCase() === customerEmail.toLowerCase()
+                      const senderLabel = isMe ? 'You' : (msg.sender_name || t.assigned_agent || 'Support Agent')
+                      const timeStr = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+
+                      return (
+                        <div
+                          key={msg.id}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: isMe ? 'flex-end' : 'flex-start'
+                          }}
+                        >
+                          <div style={{
+                            maxWidth: '82%', padding: '10px 14px', borderRadius: 14,
+                            borderBottomRightRadius: isMe ? 3 : 14,
+                            borderBottomLeftRadius: !isMe ? 3 : 14,
+                            background: isMe ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : 'var(--bg-surface)',
+                            color: isMe ? '#ffffff' : 'var(--text-primary)',
+                            border: isMe ? 'none' : '1px solid var(--border)',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                            fontSize: '0.86rem', lineHeight: 1.45
+                          }}>
+                            {msg.text && <div>{msg.text}</div>}
+                            {msg.file_attachment && (
+                              <div style={{ marginTop: msg.text ? 8 : 0 }}>
+                                {msg.file_attachment.type?.startsWith('image/') ? (
+                                  <img
+                                    src={msg.file_attachment.url}
+                                    alt={msg.file_attachment.name}
+                                    style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, marginTop: 4 }}
+                                  />
+                                ) : (
+                                  <a
+                                    href={msg.file_attachment.url}
+                                    download={msg.file_attachment.name}
+                                    style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+                                      background: 'rgba(255,255,255,0.15)', borderRadius: 8, color: 'inherit',
+                                      fontSize: '0.78rem', textDecoration: 'none', fontWeight: 600, marginTop: 4
+                                    }}
+                                  >
+                                    <Paperclip size={14} /> {msg.file_attachment.name} ({msg.file_attachment.size})
+                                  </a>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 3, padding: '0 4px', fontWeight: 500 }}>
+                            {senderLabel} &bull; {timeStr}
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+
+                  <div ref={directChatEndRef} />
+                </div>
+
+                {/* Selected File Preview Chip */}
+                {chatFile && (
+                  <div style={{ padding: '8px 16px', background: 'rgba(59,130,246,0.08)', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--accent)', fontWeight: 600 }}>
+                      <Paperclip size={14} /> Attached: {chatFile.name} ({chatFile.size})
+                    </div>
+                    <button type="button" onClick={() => setChatFile(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 700 }}>✕ Remove</button>
+                  </div>
+                )}
+
+                {/* Embedded Chat Input Bar */}
+                <form
+                  onSubmit={handleSendDirectChat}
+                  style={{
+                    padding: '12px 16px', background: 'var(--bg-surface)', borderTop: '1px solid var(--border)',
+                    display: 'flex', alignItems: 'center', gap: 10
+                  }}
+                >
+                  <label
+                    title="Import/Attach File or Image"
+                    style={{
+                      cursor: 'pointer', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-input)',
+                      border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)'
+                    }}
+                  >
+                    <Paperclip size={18} />
+                    <input
+                      type="file"
+                      ref={chatFileInputRef}
+                      onChange={handleChatFileSelect}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder={`Message ${t.assigned_agent || 'Support Agent'}...`}
+                    value={directChatInput}
+                    onChange={e => setDirectChatInput(e.target.value)}
+                    style={{
+                      flex: 1, padding: '9px 14px', borderRadius: 8, fontSize: '0.86rem',
+                      border: '1px solid var(--border)', background: 'var(--bg-card)'
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={(!directChatInput.trim() && !chatFile) || directChatSending}
+                    style={{
+                      padding: '9px 18px', borderRadius: 8, display: 'inline-flex',
+                      alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.84rem'
+                    }}
+                  >
+                    <span>{directChatSending ? 'Sending…' : 'Send'}</span>
+                    <Send size={14} />
                   </button>
-                </div>
+                </form>
               </div>
             )}
 

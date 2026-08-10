@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets, updateTicket, getSynchronizedPriorityAndScore } from '../services/api'
-import { getAgents, getMatchingAgentsForTicket } from '../services/agents'
+import { getAgents, getMatchingAgentsForTicket, getDirectMessages, sendDirectMessage } from '../services/agents'
 import { supabase } from '../lib/supabase'
-import { Filter, ChevronRight, ShieldCheck, Layers, UserCheck, Download, Zap, Sparkles, CheckCircle2 } from 'lucide-react'
+import { Filter, ChevronRight, ShieldCheck, Layers, UserCheck, Download, Zap, Sparkles, CheckCircle2, MessageSquare, Send, X, RefreshCw, Paperclip } from 'lucide-react'
 
 const priorityClass = { Critical: 'critical', High: 'high', Medium: 'medium', Low: 'low' }
 const statusClass = { Open: 'open', 'In Progress': 'progress', 'On Hold': 'hold', Resolved: 'resolved' }
@@ -24,6 +24,19 @@ function getTicketDepartment(ticket) {
 
 export default function TicketQueue({ user }) {
   const navigate = useNavigate()
+
+  const demoUser = (() => {
+    try { return JSON.parse(localStorage.getItem('demo_user') || '{}') } catch { return {} }
+  })()
+  const activeRole = demoUser.role || localStorage.getItem('user_role_mode') || 'customer'
+  const isAgent = activeRole === 'agent'
+  const isAdmin = activeRole === 'admin'
+  const isCustomer = activeRole === 'customer'
+  const agentDepartment = demoUser.department || ''
+
+  const agentEmail = (demoUser.email || user?.email || 'agent@ticketflow.ai').toLowerCase()
+  const agentName = demoUser.name || user?.user_metadata?.full_name || 'Support Agent'
+
   const [tickets, setTickets] = useState([])
   const [registeredAgents, setRegisteredAgents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -32,6 +45,95 @@ export default function TicketQueue({ user }) {
   const [autoAssigning, setAutoAssigning] = useState(false)
   const [assignSuccessMsg, setAssignSuccessMsg] = useState('')
   const [selectedTickets, setSelectedTickets] = useState(new Set())
+
+  // Agent Direct Admin Chat State
+  const [showAdminChatModal, setShowAdminChatModal] = useState(false)
+  const [agentChatMsgs, setAgentChatMsgs] = useState([])
+  const [agentInputText, setAgentInputText] = useState('')
+  const [agentSending, setAgentSending] = useState(false)
+  const [agentChatFile, setAgentChatFile] = useState(null)
+  const agentFileInputRef = useRef(null)
+  const agentChatEndRef = useRef(null)
+
+  const handleAgentChatFileSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      setAgentChatFile({
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        size: (file.size / 1024).toFixed(1) + ' KB',
+        url: evt.target?.result
+      })
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // Poll for real incoming admin messages every 2 seconds when chat is open
+  useEffect(() => {
+    if (!showAdminChatModal || !isAgent) return
+    let isMounted = true
+
+    const loadRealAgentMessages = async () => {
+      try {
+        const msgs = await getDirectMessages(agentEmail, 'admin@ticketflow.ai')
+        if (isMounted) {
+          setAgentChatMsgs(msgs)
+        }
+      } catch { /* ignore */ }
+    }
+
+    loadRealAgentMessages()
+    const interval = setInterval(loadRealAgentMessages, 2000)
+
+    return () => {
+      isMounted = false
+      clearInterval(interval)
+    }
+  }, [showAdminChatModal, isAgent, agentEmail])
+
+  useEffect(() => {
+    if (showAdminChatModal) {
+      agentChatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [agentChatMsgs, showAdminChatModal])
+
+  const openAdminChatDrawer = async () => {
+    setShowAdminChatModal(true)
+    try {
+      const msgs = await getDirectMessages(agentEmail, 'admin@ticketflow.ai')
+      setAgentChatMsgs(msgs)
+    } catch {
+      setAgentChatMsgs([])
+    }
+  }
+
+  const handleSendAgentReply = async (e) => {
+    if (e) e.preventDefault()
+    if ((!agentInputText.trim() && !agentChatFile) || agentSending) return
+
+    const textToSend = agentInputText.trim()
+    const fileToSend = agentChatFile
+    setAgentInputText('')
+    setAgentChatFile(null)
+    setAgentSending(true)
+
+    try {
+      const sentMsg = await sendDirectMessage({
+        senderEmail: agentEmail,
+        senderName: agentName,
+        receiverEmail: 'admin@ticketflow.ai',
+        text: textToSend,
+        fileAttachment: fileToSend
+      })
+      setAgentChatMsgs(prev => [...prev, sentMsg])
+    } catch (err) {
+      console.error('Failed to send agent reply:', err)
+    } finally {
+      setAgentSending(false)
+    }
+  }
 
   const toggleSelectAll = (filteredTickets) => {
     if (selectedTickets.size === filteredTickets.length) {
@@ -72,15 +174,6 @@ export default function TicketQueue({ user }) {
       await Promise.all(ids.map(id => updateTicket(id, { priority: newPriority })))
     } catch { /* fallback handled */ }
   }
-
-  const demoUser = (() => {
-    try { return JSON.parse(localStorage.getItem('demo_user') || '{}') } catch { return {} }
-  })()
-  const activeRole = demoUser.role || localStorage.getItem('user_role_mode') || 'customer'
-  const isAgent = activeRole === 'agent'
-  const isAdmin = activeRole === 'admin'
-  const isCustomer = activeRole === 'customer'
-  const agentDepartment = demoUser.department || ''
 
   useEffect(() => {
     // Load agents from Supabase
@@ -230,13 +323,27 @@ export default function TicketQueue({ user }) {
                   Showing tickets explicitly assigned to you. Unassigned tickets are managed by Administrator.
                 </div>
               </div>
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '5px 12px', borderRadius: 8,
-                background: 'rgba(16,185,129,0.12)', color: '#059669',
-                fontSize: '0.78rem', fontWeight: 700,
-              }}>
-                <Layers size={13} /> {sorted.length} active
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={openAdminChatDrawer}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                    color: '#ffffff', fontWeight: 700, fontSize: '0.8rem',
+                    padding: '6px 14px', borderRadius: 8, boxShadow: '0 2px 8px rgba(37,99,235,0.25)'
+                  }}
+                >
+                  <MessageSquare size={14} /> 💬 Direct Admin Messages
+                </button>
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '5px 12px', borderRadius: 8,
+                  background: 'rgba(16,185,129,0.12)', color: '#059669',
+                  fontSize: '0.78rem', fontWeight: 700,
+                }}>
+                  <Layers size={13} /> {sorted.length} active
+                </div>
               </div>
             </div>
           )}
@@ -533,13 +640,206 @@ export default function TicketQueue({ user }) {
           >
             🗑️ Close Tickets ({selectedTickets.size})
           </button>
-
           <button
             style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.78rem', cursor: 'pointer', marginLeft: 8 }}
             onClick={() => setSelectedTickets(new Set())}
           >
             Cancel
           </button>
+        </div>
+      )}
+
+      {/* 💬 Agent Direct Admin Chat Modal */}
+      {showAdminChatModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(6px)',
+          zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 20
+        }}>
+          <div style={{
+            width: '100%', maxWidth: 540, height: 620, background: '#ffffff',
+            borderRadius: 20, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            border: '1px solid #e2e8f0'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '16px 20px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+              color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              borderBottom: '1px solid rgba(255,255,255,0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 42, height: 42, borderRadius: '50%', background: '#10b981',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: '0.95rem', color: '#fff'
+                }}>
+                  AD
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Administrator (Master Admin)
+                    <span style={{ fontSize: '0.7rem', padding: '2px 7px', borderRadius: 10, background: 'rgba(16,185,129,0.2)', color: '#34d399', fontWeight: 700 }}>
+                      🟢 Direct Channel
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
+                    admin@ticketflow.ai &bull; Master Operations
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowAdminChatModal(false)}
+                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', cursor: 'pointer', padding: 6, borderRadius: 8, display: 'flex' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Messages Body */}
+            <div style={{
+              flex: 1, padding: 20, overflowY: 'auto', background: '#f8fafc',
+              display: 'flex', flexDirection: 'column', gap: 14
+            }}>
+              <div style={{ textAlign: 'center', margin: '8px 0 16px' }}>
+                <span style={{ fontSize: '0.72rem', background: '#e2e8f0', color: '#64748b', padding: '4px 12px', borderRadius: 12, fontWeight: 600 }}>
+                  🔒 Direct Encrypted Admin Channel
+                </span>
+              </div>
+
+              {agentChatMsgs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
+                  <div style={{ fontSize: '2rem', marginBottom: 8 }}>💬</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#64748b', marginBottom: 4 }}>
+                    Direct Communication with Administrator
+                  </div>
+                  <div style={{ fontSize: '0.78rem' }}>
+                    No messages yet from Administrator. You can send a direct update below.
+                  </div>
+                </div>
+              ) : (
+                agentChatMsgs.map(msg => {
+                  const isMe = msg.sender_email?.toLowerCase() === agentEmail.toLowerCase()
+                  const senderLabel = isMe ? 'You' : 'Administrator'
+                  const timeStr = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+
+                  return (
+                    <div
+                      key={msg.id}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: isMe ? 'flex-end' : 'flex-start'
+                      }}
+                    >
+                      <div style={{
+                        maxWidth: '82%', padding: '12px 16px', borderRadius: 16,
+                        borderBottomRightRadius: isMe ? 4 : 16,
+                        borderBottomLeftRadius: !isMe ? 4 : 16,
+                        background: isMe ? 'linear-gradient(135deg, #10b981, #059669)' : '#ffffff',
+                        color: isMe ? '#ffffff' : '#0f172a',
+                        border: isMe ? 'none' : '1px solid #e2e8f0',
+                        boxShadow: isMe ? '0 4px 12px rgba(16,185,129,0.2)' : '0 2px 6px rgba(0,0,0,0.03)',
+                        fontSize: '0.88rem', lineHeight: 1.5
+                      }}>
+                        {msg.text && <div>{msg.text}</div>}
+                        {msg.file_attachment && (
+                          <div style={{ marginTop: msg.text ? 8 : 0 }}>
+                            {msg.file_attachment.type?.startsWith('image/') ? (
+                              <img
+                                src={msg.file_attachment.url}
+                                alt={msg.file_attachment.name}
+                                style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, marginTop: 4 }}
+                              />
+                            ) : (
+                              <a
+                                href={msg.file_attachment.url}
+                                download={msg.file_attachment.name}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+                                  background: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)', borderRadius: 8, color: 'inherit',
+                                  fontSize: '0.78rem', textDecoration: 'none', fontWeight: 600, marginTop: 4
+                                }}
+                              >
+                                <Paperclip size={14} /> {msg.file_attachment.name} ({msg.file_attachment.size})
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: 4, padding: '0 4px', fontWeight: 500 }}>
+                        {senderLabel} &bull; {timeStr}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+
+              <div ref={agentChatEndRef} />
+            </div>
+
+            {/* Selected File Chip */}
+            {agentChatFile && (
+              <div style={{ padding: '8px 16px', background: 'rgba(16,185,129,0.08)', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#059669', fontWeight: 600 }}>
+                  <Paperclip size={14} /> Attached: {agentChatFile.name} ({agentChatFile.size})
+                </div>
+                <button type="button" onClick={() => setAgentChatFile(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 700 }}>✕ Remove</button>
+              </div>
+            )}
+
+            {/* Input Footer */}
+            <form
+              onSubmit={handleSendAgentReply}
+              style={{
+                padding: '14px 16px', background: '#ffffff', borderTop: '1px solid #e2e8f0',
+                display: 'flex', alignItems: 'center', gap: 10
+              }}
+            >
+              <label
+                title="Import/Attach File or Image"
+                style={{
+                  cursor: 'pointer', padding: '8px 10px', borderRadius: 10, background: '#f8fafc',
+                  border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b'
+                }}
+              >
+                <Paperclip size={18} />
+                <input
+                  type="file"
+                  ref={agentFileInputRef}
+                  onChange={handleAgentChatFileSelect}
+                  style={{ display: 'none' }}
+                />
+              </label>
+
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Message Administrator..."
+                value={agentInputText}
+                onChange={e => setAgentInputText(e.target.value)}
+                style={{
+                  flex: 1, padding: '10px 14px', borderRadius: 10, fontSize: '0.88rem',
+                  border: '1px solid #cbd5e1', background: '#f8fafc'
+                }}
+              />
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={(!agentInputText.trim() && !agentChatFile) || agentSending}
+                style={{
+                  padding: '10px 18px', borderRadius: 10, display: 'inline-flex',
+                  alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.86rem',
+                  background: '#10b981', border: 'none'
+                }}
+              >
+                <span>Send</span>
+                <Send size={14} />
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </div>

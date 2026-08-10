@@ -61,7 +61,41 @@ export const TRANSLATIONS = {
     view_my_queue: 'View My Tickets Queue',
     submit_another: 'Submit Another Query',
     copy_id: 'Copy ID',
-    copied: 'Copied!'
+    copied: 'Copied!',
+
+    // FAQ & Help
+    faq_title: 'Knowledge Base & FAQ',
+    faq_subtitle: 'Find answers to common questions or submit a ticket if you need further help.',
+    faq_search_placeholder: "Ask AI or search knowledge base (e.g. 'How to track ticket', '504 error')...",
+    all_categories: 'All',
+    category_general: 'General',
+    category_tech: 'Technical Support',
+    category_billing: 'Billing & Subscriptions',
+    category_account: 'Account & Access',
+    no_faqs_found: 'No matching questions found',
+    no_faqs_sub: 'Try searching with different keywords or submit a ticket to our support team.',
+    still_need_help: 'Still need assistance?',
+    contact_support_text: 'Our AI engine and specialist engineering team are ready to resolve your issue.',
+    create_ticket_now: 'Create a Support Ticket',
+
+    // Track Ticket Page
+    track_title: 'Track Support Ticket',
+    track_subtitle: 'Enter your Ticket ID below to check live status, assigned specialist, and SLA countdown.',
+    enter_ticket_id: 'Enter Ticket ID *',
+    ticket_id_placeholder: 'e.g. TK-8842 or 550e8400-e29b-41d4-a716-446655440000',
+    track_now_btn: 'Track Ticket Status',
+    searching_ticket: 'Searching Ticket...',
+    ticket_not_found: 'Ticket Not Found',
+    ticket_not_found_sub: 'No ticket found with ID',
+    check_id_hint: 'Please check your Ticket ID and try again.',
+
+    // Ticket History & Queue
+    ticket_history_title: 'My Tickets & Support History',
+    ticket_history_sub: 'Track status, assigned agents, and updates on all your submitted support queries.',
+    filter_status: 'Filter by Status',
+    filter_priority: 'Filter by Priority',
+    no_tickets_found: 'No tickets found',
+    no_tickets_sub: 'You have not submitted any tickets yet.',
   },
   hi: {
     // Topbar & Nav
@@ -123,7 +157,41 @@ export const TRANSLATIONS = {
     view_my_queue: 'मेरे टिकट देखें',
     submit_another: 'एक और टिकट सबमिट करें',
     copy_id: 'आईडी कॉपी करें',
-    copied: 'कॉपी हो गया!'
+    copied: 'कॉपी हो गया!',
+
+    // FAQ & Help (Hindi)
+    faq_title: 'ज्ञान केंद्र और सामान्य प्रश्न (FAQ)',
+    faq_subtitle: 'सामान्य प्रश्नों के उत्तर खोजें या सहायता के लिए नया टिकट जमा करें।',
+    faq_search_placeholder: "एआई से पूछें या ज्ञान केंद्र में खोजें (जैसे 'टिकट ट्रैक कैसे करें', '504 एरर')...",
+    all_categories: 'सभी',
+    category_general: 'सामान्य (General)',
+    category_tech: 'तकनीकी सहायता (Technical Support)',
+    category_billing: 'बिलिंग और सदस्यता (Billing)',
+    category_account: 'खाता और पहुंच (Account)',
+    no_faqs_found: 'कोई मेल खाते प्रश्न नहीं मिले',
+    no_faqs_sub: 'अन्य खोज शब्दों का प्रयास करें या सहायता टीम को टिकट सबमिट करें।',
+    still_need_help: 'क्या आपको अभी भी सहायता की आवश्यकता है?',
+    contact_support_text: 'हमारा एआई इंजन और विशेषज्ञ इंजीनियर्स आपकी समस्या को तुरंत हल करने के लिए तैयार हैं।',
+    create_ticket_now: 'सहायता टिकट बनाएं',
+
+    // Track Ticket Page (Hindi)
+    track_title: 'सहायता टिकट ट्रैक करें',
+    track_subtitle: 'लाइव स्थिति, आवंटित विशेषज्ञ और एसएलए समय देखने के लिए नीचे अपनी टिकट आईडी दर्ज करें।',
+    enter_ticket_id: 'टिकट आईडी दर्ज करें *',
+    ticket_id_placeholder: 'जैसे TK-8842 या 550e8400-e29b-41d4-a716-446655440000',
+    track_now_btn: 'टिकट स्थिति जांचें',
+    searching_ticket: 'टिकट खोजा जा रहा है...',
+    ticket_not_found: 'टिकट नहीं मिला',
+    ticket_not_found_sub: 'इस आईडी के साथ कोई टिकट नहीं मिला',
+    check_id_hint: 'कृपया अपनी टिकट आईडी की जांच करें और पुनः प्रयास करें।',
+
+    // Ticket History & Queue (Hindi)
+    ticket_history_title: 'मेरे टिकट और सहायता इतिहास',
+    ticket_history_sub: 'अपने सभी सबमिट किए गए प्रश्नों की लाइव स्थिति और अपडेट ट्रैक करें।',
+    filter_status: 'स्थिति के अनुसार फ़िल्टर करें',
+    filter_priority: 'प्राथमिकता के अनुसार फ़िल्टर करें',
+    no_tickets_found: 'कोई टिकट नहीं मिला',
+    no_tickets_sub: 'आपने अभी तक कोई टिकट सबमिट नहीं किया है।',
   }
 }
 

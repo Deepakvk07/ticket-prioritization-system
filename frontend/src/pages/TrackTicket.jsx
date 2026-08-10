@@ -3,12 +3,14 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTicket } from '../services/api'
+import { useTranslation } from '../lib/i18n'
 import { Search, Search as SearchIcon, CheckCircle2, Clock, Cpu, ShieldCheck, AlertCircle, ArrowLeft, Tag } from 'lucide-react'
 
 const statusSteps = ['Open', 'In Progress', 'Resolved']
 const priorityClass = { Critical: 'critical', High: 'high', Medium: 'medium', Low: 'low' }
 
 export default function TrackTicket({ user }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const initialCode = searchParams.get('id') || ''
@@ -31,10 +33,10 @@ export default function TrackTicket({ user }) {
       if (data && data.id) {
         setTicket(data)
       } else {
-        setError('No ticket found matching that ticket number or ID.')
+        setError(t('ticket_not_found_sub') || 'No ticket found matching that ticket number or ID.')
       }
     } catch (err) {
-      setError('Ticket not found. Please check your ticket number and try again.')
+      setError(t('check_id_hint') || 'Ticket not found. Please check your ticket number and try again.')
     } finally {
       setLoading(false)
     }
@@ -50,7 +52,7 @@ export default function TrackTicket({ user }) {
     <div className="app-layout">
       <Sidebar user={user} />
       <div className="main-content">
-        <Topbar user={user} placeholder="Search tickets by ID, subject..." />
+        <Topbar user={user} placeholder={t('search_placeholder')} />
 
         <div className="page-body animate-fade">
           
@@ -59,9 +61,9 @@ export default function TrackTicket({ user }) {
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#3b82f6', fontSize: '0.8rem', fontWeight: 600, marginBottom: 10 }}>
               <SearchIcon size={14} /> LIVE TICKET TRACKING
             </div>
-            <h2 style={{ fontSize: '1.8rem', fontWeight: 800, margin: '0 0 6px', color: '#ffffff' }}>Track My Ticket Status</h2>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: 800, margin: '0 0 6px', color: '#ffffff' }}>{t('track_title')}</h2>
             <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.9rem' }}>
-              Enter your Ticket Number (e.g. <strong style={{ color: '#ffffff' }}>TK-8842</strong> or ticket ID) to check real-time resolution status and AI triage details.
+              {t('track_subtitle')}
             </p>
           </div>
 
@@ -73,7 +75,7 @@ export default function TrackTicket({ user }) {
                   type="text"
                   className="form-input"
                   style={{ paddingLeft: 44, fontSize: '1rem', height: 48, fontFamily: 'monospace' }}
-                  placeholder="Enter Ticket Code (e.g. TK-8842 or ticket UUID)..."
+                  placeholder={t('ticket_id_placeholder')}
                   value={ticketIdInput}
                   onChange={e => setTicketIdInput(e.target.value)}
                   required
@@ -81,7 +83,7 @@ export default function TrackTicket({ user }) {
                 <SearchIcon size={20} color="var(--text-muted)" style={{ position: 'absolute', left: 14, top: 14 }} />
               </div>
               <button type="submit" className="btn btn-primary" disabled={loading || !ticketIdInput.trim()} style={{ padding: '0 28px', height: 48, fontWeight: 700 }}>
-                {loading ? 'Searching...' : 'Track Ticket'}
+                {loading ? t('searching_ticket') : t('track_now_btn')}
               </button>
             </form>
 
