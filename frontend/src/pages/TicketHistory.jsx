@@ -46,10 +46,12 @@ export default function TicketHistory({ user }) {
     const isResolved = ['Resolved', 'Closed'].includes(t.status)
     if (!isResolved) return false
 
-    // Agent specialist filter
-    if (isAgent && agentDepartment) {
-      const dept = getTicketDepartment(t)
-      if (dept !== agentDepartment) return false
+    // Agent filter: ONLY show tickets assigned explicitly to this agent
+    if (isAgent) {
+      if (!t.assigned_agent || t.assigned_agent === 'Unassigned') return false
+      const isDirectlyAssigned = (t.assigned_agent && t.assigned_agent.toLowerCase().includes(demoUser.name?.toLowerCase() || '___')) ||
+                                 (t.assigned_agent_email && t.assigned_agent_email === demoUser.email)
+      if (!isDirectlyAssigned) return false
     }
 
     // Priority filter

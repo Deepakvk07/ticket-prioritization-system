@@ -174,14 +174,13 @@ export default function TicketQueue({ user }) {
     if (statusFilter && t.status !== statusFilter) return false
     if (priorityFilter && t.priority !== priorityFilter) return false
 
-    // If logged in as an Agent, only show tickets assigned specifically to them OR matching their department
+    // If logged in as an Agent, ONLY show tickets explicitly assigned to this agent.
+    // Unassigned tickets are NEVER shown to agents (Admin only until assigned).
     if (isAgent) {
+      if (!t.assigned_agent || t.assigned_agent === 'Unassigned') return false
       const isDirectlyAssigned = (t.assigned_agent && t.assigned_agent.toLowerCase().includes(demoUser.name?.toLowerCase() || '___')) ||
                                  (t.assigned_agent_email && t.assigned_agent_email === demoUser.email)
-      const ticketDepts = getTicketDepartment(t)
-      const isDeptMatch = agentDepartment && ticketDepts.includes(agentDepartment)
-
-      if (!isDirectlyAssigned && !isDeptMatch) return false
+      if (!isDirectlyAssigned) return false
     }
 
     return true
@@ -228,7 +227,7 @@ export default function TicketQueue({ user }) {
                   Assigned Workspace: {demoUser.name || 'Support Specialist'} {agentDepartment ? `(${agentDepartment})` : ''}
                 </div>
                 <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                  Showing tickets linked specifically to you or routed to your specialist category.
+                  Showing tickets explicitly assigned to you. Unassigned tickets are managed by Administrator.
                 </div>
               </div>
               <div style={{
