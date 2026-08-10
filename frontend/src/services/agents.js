@@ -86,7 +86,7 @@ export async function removeAgent(email) {
 
 /**
  * Intelligently matches a ticket to specialist agents based on problem text (subject, description, category, product_module).
- * Returns ONLY agents specializing in that specific problem category.
+ * Returns ONLY the specific agent specializing in that specific problem category.
  */
 export function getMatchingAgentsForTicket(ticket, registeredAgents) {
   if (!registeredAgents || registeredAgents.length === 0) return []
@@ -100,7 +100,7 @@ export function getMatchingAgentsForTicket(ticket, registeredAgents) {
   const fullText = `${subject} ${desc} ${cat} ${module} ${issue}`
 
   // 1. Database & Infrastructure Specialist
-  if (/database|db|postgres|sql|mongo|redis|infra|server|crash|cluster|timeout|connection leak|downtime|cpu|memory|storage|disk/i.test(fullText)) {
+  if (/database|db|postgres|sql|mongo|redis|infra|server|cluster|timeout|connection|downtime|cpu|memory|storage|disk|crashed/i.test(fullText)) {
     const dbAgents = registeredAgents.filter(a => {
       const d = (a.department || '').toLowerCase()
       return d.includes('database') || d.includes('infra') || d.includes('server')
@@ -109,7 +109,7 @@ export function getMatchingAgentsForTicket(ticket, registeredAgents) {
   }
 
   // 2. Billing & Integrations / Payment Specialist
-  if (/billing|payment|invoice|refund|charge|credit card|checkout|subscription|integration|stripe|paypal|transaction/i.test(fullText)) {
+  if (/billing|payment|invoice|refund|charge|credit|card|checkout|subscription|integration|stripe|paypal|transaction|accepted/i.test(fullText)) {
     const billingAgents = registeredAgents.filter(a => {
       const d = (a.department || '').toLowerCase()
       return d.includes('billing') || d.includes('integration') || d.includes('payment')
@@ -118,7 +118,7 @@ export function getMatchingAgentsForTicket(ticket, registeredAgents) {
   }
 
   // 3. Web & UI/UX / App Specialist
-  if (/ui|ux|frontend|web|app|button|layout|display|css|screen|react|view|page|browser|render|app crash/i.test(fullText)) {
+  if (/ui|ux|frontend|web|layout|display|css|screen|react|view|page|browser|render|app crash|button|design|working/i.test(fullText)) {
     const webAgents = registeredAgents.filter(a => {
       const d = (a.department || '').toLowerCase()
       return d.includes('web') || d.includes('ui') || d.includes('ux') || d.includes('frontend')
@@ -135,7 +135,7 @@ export function getMatchingAgentsForTicket(ticket, registeredAgents) {
     if (apiAgents.length > 0) return apiAgents
   }
 
-  // 5. Check if department matches any word in category or problem text
+  // 5. Department keyword match
   const deptMatch = registeredAgents.filter(a => {
     const d = (a.department || '').toLowerCase()
     return d === cat || cat.includes(d) || d.includes(cat) || fullText.includes(d)
@@ -149,6 +149,7 @@ export function getMatchingAgentsForTicket(ticket, registeredAgents) {
   })
   if (supportAgents.length > 0) return supportAgents
 
-  // Return all agents as absolute fallback if no department match exists
-  return registeredAgents
+  // 7. Strict fallback: pick single agent deterministically based on ticket ID hash
+  const ticketIndex = Math.abs((ticket?.id || ticket?.subject || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % registeredAgents.length
+  return [registeredAgents[ticketIndex]]
 }
