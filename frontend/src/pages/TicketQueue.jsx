@@ -343,42 +343,18 @@ export default function TicketQueue({ user }) {
       <div className="main-content">
         <Topbar user={user} placeholder="Search tickets in queue..." />
         <div className="page-body animate-fade">
-          <div className="page-header" style={{ marginBottom: 20 }}>
-            <h2>{isCustomer ? 'My Submitted Tickets' : isAgent ? 'Assigned Tickets Queue' : 'AI-Ranked Ticket Queue'}</h2>
-            <p>
-              {isCustomer
-                ? `Showing tickets submitted by ${demoUser.name || user?.user_metadata?.full_name || user?.email || 'you'}. Track status and chat directly with your assigned agent.`
-                : isAgent
-                ? 'Tickets assigned explicitly to your specialist queue sorted by AI urgency.'
-                : 'All enterprise tickets sorted in strict priority order with user filtering and auto-assignment.'}
-            </p>
-          </div>
-
-          {/* Customer Privacy & Account Banner */}
-          {isCustomer && (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
-              padding: '14px 20px', marginBottom: 20, borderRadius: 12,
-              background: 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(29,78,216,0.04))',
-              border: '1px solid rgba(37,99,235,0.2)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 38, height: 38, borderRadius: 10,
-                  background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '1rem', fontWeight: 800
-                }}>
-                  👤
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    My Account: {demoUser.name || user?.user_metadata?.full_name || 'Customer'} {currentUserEmail ? `(${currentUserEmail})` : ''}
-                  </div>
-                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                    🔒 Privacy Protection Active: Showing only tickets submitted by your account.
-                  </div>
-                </div>
-              </div>
+          <div className="page-header" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h2>{isCustomer ? 'My Submitted Tickets' : isAgent ? 'Assigned Tickets Queue' : 'AI-Ranked Ticket Queue'}</h2>
+              <p>
+                {isCustomer
+                  ? `Showing tickets submitted by ${demoUser.name || user?.user_metadata?.full_name || user?.email || 'you'}. Track status and chat directly with your assigned agent.`
+                  : isAgent
+                  ? 'Tickets assigned explicitly to your specialist queue sorted by AI urgency.'
+                  : 'All enterprise tickets sorted in strict priority order with user filtering and auto-assignment.'}
+              </p>
+            </div>
+            {isCustomer && (
               <button
                 className="btn btn-primary btn-sm"
                 onClick={() => navigate('/home')}
@@ -386,8 +362,8 @@ export default function TicketQueue({ user }) {
               >
                 + Submit New Ticket
               </button>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Agent Specialist Banner */}
           {isAgent && (
