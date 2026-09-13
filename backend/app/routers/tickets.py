@@ -43,6 +43,8 @@ async def predict_ticket_priority(req: PredictRequest):
 async def list_tickets(
     status: Optional[str] = Query(None),
     priority: Optional[str] = Query(None),
+    customer_email: Optional[str] = Query(None),
+    assigned_agent: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
@@ -52,6 +54,10 @@ async def list_tickets(
         query = query.eq("status", status)
     if priority:
         query = query.eq("priority", priority)
+    if customer_email:
+        query = query.ilike("customer_email", customer_email.strip())
+    if assigned_agent:
+        query = query.ilike("assigned_agent", f"%{assigned_agent.strip()}%")
     resp = query.execute()
     
     data = resp.data or []

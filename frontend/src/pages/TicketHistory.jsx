@@ -34,6 +34,9 @@ export default function TicketHistory({ user }) {
   const agentDepartment = demoUser.department || ''
   const activeRole = demoUser.role || localStorage.getItem('user_role_mode') || 'customer'
   const isAgent = activeRole === 'agent'
+  const isCustomer = activeRole === 'customer'
+  const currentUserEmail = (user?.email || demoUser.email || localStorage.getItem('user_email') || '').toLowerCase().trim()
+  const currentUserName = (user?.user_metadata?.full_name || user?.name || demoUser.name || '').toLowerCase().trim()
 
   useEffect(() => {
     getTickets()
@@ -46,6 +49,13 @@ export default function TicketHistory({ user }) {
   const historyTickets = tickets.filter(t => {
     const isResolved = ['Resolved', 'Closed'].includes(t.status)
     if (!isResolved) return false
+
+    // Customer filter: ONLY show tickets submitted by this customer matching exact authenticated email
+    if (isCustomer) {
+      const tCustEmail = (t.customer_email || '').toLowerCase().trim()
+      const myEmail = (currentUserEmail || '').toLowerCase().trim()
+      if (!myEmail || !tCustEmail || tCustEmail !== myEmail) return false
+    }
 
     // Agent filter: ONLY show tickets assigned explicitly to this agent
     if (isAgent) {

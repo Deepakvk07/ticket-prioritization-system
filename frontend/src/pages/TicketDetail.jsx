@@ -34,32 +34,86 @@ export default function TicketDetail({ user }) {
   const chatFileInputRef = useRef(null)
   const directChatEndRef = useRef(null)
 
-  const handleChatFileSelect = (e) => {
+  const compressImage = (file, maxWidth = 1200, quality = 0.8) => {
+    return new Promise((resolve) => {
+      const isImg = file.type?.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name)
+      if (!isImg) {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve({
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: (file.size / 1024).toFixed(1) + ' KB',
+          url: e.target?.result
+        })
+        reader.readAsDataURL(file)
+        return
+      }
+
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = () => {
+          let width = img.width
+          let height = img.height
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width)
+            width = maxWidth
+          }
+
+          const canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, width, height)
+
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality)
+          const approxSizeKb = Math.round((compressedDataUrl.length * 3 / 4) / 1024)
+
+          resolve({
+            name: file.name,
+            type: 'image/jpeg',
+            size: `${approxSizeKb} KB`,
+            url: compressedDataUrl
+          })
+        }
+        img.onerror = () => {
+          resolve({
+            name: file.name,
+            type: file.type || 'image/png',
+            size: (file.size / 1024).toFixed(1) + ' KB',
+            url: e.target?.result
+          })
+        }
+        img.src = e.target?.result
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleChatFileSelect = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      setChatFile({
-        name: file.name,
-        type: file.type || 'application/octet-stream',
-        size: (file.size / 1024).toFixed(1) + ' KB',
-        url: evt.target?.result
-      })
+    try {
+      const processedFile = await compressImage(file)
+      setChatFile(processedFile)
+    } catch (err) {
+      console.error('File compression error:', err)
     }
-    reader.readAsDataURL(file)
   }
 
   const demoUser = (() => {
     try { return JSON.parse(localStorage.getItem('demo_user') || '{}') } catch { return {} }
   })()
-  const currentUserEmail = (user?.email || demoUser.email || localStorage.getItem('user_email') || '').toLowerCase()
-  const isAgentEmail = currentUserEmail.includes('agent') || currentUserEmail.includes('admin') || ['vedprakash@gmail.com', 'amar@gmail.com', 'deepak@gmail.com', 'siddharth@gmail.com'].includes(currentUserEmail)
-  const isStaff = (demoUser.role === 'admin' || demoUser.role === 'agent' || isAgentEmail) && (currentUserEmail ? isAgentEmail : (demoUser.role === 'admin' || demoUser.role === 'agent'))
+  const activeRole = demoUser.role || localStorage.getItem('user_role_mode') || 'customer'
+  const isCustomer = activeRole === 'customer'
+  const isStaff = !isCustomer && (activeRole === 'agent' || activeRole === 'admin')
+  const currentUserEmail = (user?.email || demoUser.email || localStorage.getItem('user_email') || '').toLowerCase().trim()
   const currentUserName = user?.user_metadata?.full_name || user?.name || demoUser.name || 'User'
 
-  const ticketCustomerEmail = (ticket?.customer_email || 'customer@gmail.com').toLowerCase()
+  const ticketCustomerEmail = (ticket?.customer_email || 'customer@gmail.com').toLowerCase().trim()
   const ticketCustomerName = ticket?.customer_name || 'Customer'
-  const ticketAgentEmail = (ticket?.assigned_agent_email || 'support@ticketflow.ai').toLowerCase()
+  const ticketAgentEmail = (ticket?.assigned_agent_email || 'support@ticketflow.ai').toLowerCase().trim()
 
   // Strict pair definition:
   // If logged-in user is Customer: chat between currentUserEmail and ticketAgentEmail
@@ -70,11 +124,11 @@ export default function TicketDetail({ user }) {
   // Dedicated sender identity for sending messages
   const mySenderEmail = isStaff
     ? (currentUserEmail || ticketAgentEmail)
-    : (ticketCustomerEmail || currentUserEmail || 'customer@gmail.com')
+    : (currentUserEmail || ticketCustomerEmail)
 
   const mySenderName = isStaff
     ? (user?.user_metadata?.full_name || user?.name || (demoUser?.role === 'agent' || demoUser?.role === 'admin' ? demoUser?.name : null) || ticket?.assigned_agent || 'Support Agent')
-    : (ticketCustomerName || user?.user_metadata?.full_name || 'Customer')
+    : (user?.user_metadata?.full_name || user?.name || demoUser?.name || ticketCustomerName || 'Customer')
 
   const myReceiverEmail = isStaff ? ticketCustomerEmail : ticketAgentEmail
 
@@ -122,6 +176,9 @@ export default function TicketDetail({ user }) {
     const fileToSend = chatFile
     setDirectChatInput('')
     setChatFile(null)
+    if (chatFileInputRef.current) {
+      chatFileInputRef.current.value = ''
+    }
     setDirectChatSending(true)
 
     try {
@@ -131,12 +188,18 @@ export default function TicketDetail({ user }) {
         receiverEmail: myReceiverEmail,
         text: textToSend,
         fileAttachment: fileToSend,
-        ticketId: id
+        ticketId: id,
+        authorRole: isStaff ? 'AGENT' : 'CUSTOMER'
       })
 
       setDirectChatMsgs(prev => [...prev, sentMsg])
       const updated = await getTicket(id).catch(() => null)
       if (updated) setTicket(updated)
+      setTimeout(() => {
+        if (directChatEndRef.current) {
+          directChatEndRef.current.scrollIntoView({ behavior: 'smooth' })
+        }
+      }, 50)
     } catch (err) {
       console.error('Failed to send direct message:', err)
     } finally {
@@ -425,6 +488,31 @@ export default function TicketDetail({ user }) {
             </p>
             <button className="btn btn-primary btn-sm" onClick={() => navigate('/tickets')}>
               <ArrowLeft size={14} /> Return to Tickets List
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const isOwner = !isCustomer || (
+    Boolean(currentUserEmail && ticketCustomerEmail && currentUserEmail === ticketCustomerEmail)
+  )
+
+  if (!isOwner) {
+    return (
+      <div className="app-layout">
+        <Sidebar user={user} />
+        <div className="main-content" style={{ background: '#ffffff', minHeight: '100vh' }}>
+          <Topbar user={user} placeholder="Search tickets..." />
+          <div className="page-body" style={{ textAlign: 'center', padding: '100px 20px' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🔒</div>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 8, color: 'var(--text-primary)' }}>Access Restricted</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: 24, fontSize: '0.88rem', maxWidth: 480, margin: '0 auto 24px' }}>
+              This ticket was submitted by another customer account ({ticketCustomerEmail}). For privacy and security, you can only access tickets associated with your authenticated email (<strong>{currentUserEmail}</strong>).
+            </p>
+            <button className="btn btn-primary btn-sm" onClick={() => navigate('/tickets')}>
+              <ArrowLeft size={14} /> Back to My Tickets
             </button>
           </div>
         </div>
@@ -810,39 +898,69 @@ export default function TicketDetail({ user }) {
                         Start a direct conversation with {t.assigned_agent || 'Support Agent'}
                       </div>
                       <div style={{ fontSize: '0.74rem' }}>
-                        Type your message below. Messages are synced instantly.
+                        Type your message below. Messages and attachments are synced instantly.
                       </div>
                     </div>
                   ) : (
                     directChatMsgs.map(msg => {
-                      const msgSender = (msg.sender_email || '').trim().toLowerCase()
-                      const role = (msg.author_role || '').toUpperCase()
+                      const sEmail = (msg.sender_email || '').trim().toLowerCase()
+                      const rEmail = (msg.receiver_email || '').trim().toLowerCase()
+                      const sRole = (msg.author_role || msg.role || '').trim().toUpperCase()
 
-                      const isThisMsgFromAgent = role === 'AGENT' ||
-                        msgSender === ticketAgentEmail.toLowerCase() ||
-                        msgSender.includes('agent') ||
-                        msgSender.includes('admin') ||
-                        msgSender.includes('@ticketflow.ai') ||
-                        msgSender === 'vedprakash@gmail.com' ||
-                        msgSender === 'amar@gmail.com' ||
-                        msgSender === 'siddharth@gmail.com'
+                      const myEmail = (currentUserEmail || '').trim().toLowerCase()
+                      const agtEmail = (ticketAgentEmail || '').trim().toLowerCase()
+                      const custEmail = (ticketCustomerEmail || '').trim().toLowerCase()
 
-                      const myEmail = (mySenderEmail || '').trim().toLowerCase()
-
+                      // Bulletproof isMe calculation:
                       let isMe = false
-                      if (msgSender && myEmail && msgSender === myEmail) {
-                        isMe = true
-                      } else if (role) {
-                        isMe = isStaff ? (role === 'AGENT') : (role === 'CUSTOMER')
+                      if (isCustomer) {
+                        // Current viewer is the CUSTOMER
+                        if (sRole === 'CUSTOMER') {
+                          isMe = true
+                        } else if (sRole === 'AGENT' || sRole === 'ADMIN') {
+                          isMe = false
+                        } else if (sEmail && myEmail && sEmail === myEmail) {
+                          isMe = true
+                        } else if (rEmail && myEmail && rEmail === myEmail) {
+                          isMe = false
+                        } else if (sEmail && custEmail && sEmail === custEmail) {
+                          isMe = true
+                        } else if (sEmail && agtEmail && sEmail === agtEmail) {
+                          isMe = false
+                        } else {
+                          isMe = false
+                        }
                       } else {
-                        isMe = isStaff ? isThisMsgFromAgent : !isThisMsgFromAgent
+                        // Current viewer is STAFF (Agent / Admin)
+                        if (sRole === 'AGENT' || sRole === 'ADMIN') {
+                          isMe = true
+                        } else if (sRole === 'CUSTOMER') {
+                          isMe = false
+                        } else if (sEmail && myEmail && sEmail === myEmail) {
+                          isMe = true
+                        } else if (rEmail && myEmail && rEmail === myEmail) {
+                          isMe = false
+                        } else if (sEmail && agtEmail && sEmail === agtEmail) {
+                          isMe = true
+                        } else if (sEmail && custEmail && sEmail === custEmail) {
+                          isMe = false
+                        } else {
+                          isMe = true
+                        }
                       }
 
+                      const isMsgFromAgent = sRole === 'AGENT' || (!sRole && (sEmail === agtEmail || sEmail.includes('agent') || sEmail.includes('@ticketflow.ai')))
                       const senderLabel = isMe
                         ? 'You'
-                        : (isThisMsgFromAgent ? (t.assigned_agent || 'Support Agent') : (ticketCustomerName || 'Customer'))
+                        : (msg.sender_name || (isMsgFromAgent ? (t.assigned_agent || 'Support Agent') : (ticketCustomerName || 'Customer')))
 
                       const timeStr = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+
+                      const hasImageAttachment = msg.file_attachment && (
+                        msg.file_attachment.type?.startsWith('image/') ||
+                        /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(msg.file_attachment.name || '') ||
+                        (msg.file_attachment.url && msg.file_attachment.url.startsWith('data:image/'))
+                      )
 
                       return (
                         <div
@@ -850,36 +968,100 @@ export default function TicketDetail({ user }) {
                           style={{
                             display: 'flex',
                             flexDirection: 'column',
-                            alignItems: isMe ? 'flex-end' : 'flex-start'
+                            alignItems: isMe ? 'flex-end' : 'flex-start',
+                            alignSelf: isMe ? 'flex-end' : 'flex-start',
+                            maxWidth: '82%',
+                            width: '100%'
                           }}
                         >
                           <div style={{
-                            maxWidth: '82%', padding: '10px 14px', borderRadius: 14,
-                            borderBottomRightRadius: isMe ? 3 : 14,
-                            borderBottomLeftRadius: !isMe ? 3 : 14,
-                            background: isMe ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : 'var(--bg-surface)',
+                            maxWidth: '82%',
+                            padding: '11px 16px',
+                            borderRadius: 16,
+                            borderBottomRightRadius: isMe ? 3 : 16,
+                            borderBottomLeftRadius: !isMe ? 3 : 16,
+                            background: isMe
+                              ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                              : 'var(--bg-surface)',
                             color: isMe ? '#ffffff' : 'var(--text-primary)',
-                            border: isMe ? 'none' : '1px solid var(--border)',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-                            fontSize: '0.86rem', lineHeight: 1.45
+                            border: isMe ? 'none' : '1px solid var(--border-active)',
+                            boxShadow: isMe
+                              ? '0 4px 14px rgba(37, 99, 235, 0.35)'
+                              : '0 4px 12px rgba(0, 0, 0, 0.08)',
+                            fontSize: '0.86rem',
+                            lineHeight: 1.45,
+                            alignSelf: isMe ? 'flex-end' : 'flex-start'
                           }}>
-                            {msg.text && <div>{msg.text}</div>}
+                            {/* Receiver Name Tag Header */}
+                            {!isMe && (
+                              <div style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                color: isMsgFromAgent ? '#2563eb' : '#059669',
+                                marginBottom: 6,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6
+                              }}>
+                                <span>{senderLabel}</span>
+                                <span style={{
+                                  fontSize: '0.62rem',
+                                  padding: '1px 6px',
+                                  borderRadius: 6,
+                                  background: isMsgFromAgent ? 'rgba(37, 99, 235, 0.12)' : 'rgba(5, 150, 105, 0.12)',
+                                  color: isMsgFromAgent ? '#2563eb' : '#059669',
+                                  border: isMsgFromAgent ? '1px solid rgba(37, 99, 235, 0.25)' : '1px solid rgba(5, 150, 105, 0.25)',
+                                  fontWeight: 800
+                                }}>
+                                  {isMsgFromAgent ? 'AGENT' : 'CUSTOMER'}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Message Text Content */}
+                            {msg.text && !msg.text.includes('📷 [Image Attachment]') && (
+                              <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{msg.text}</div>
+                            )}
+
+                            {/* File / Image Attachment Content */}
                             {msg.file_attachment && (
-                              <div style={{ marginTop: msg.text ? 8 : 0 }}>
-                                {msg.file_attachment.type?.startsWith('image/') ? (
-                                  <img
-                                    src={msg.file_attachment.url}
-                                    alt={msg.file_attachment.name}
-                                    style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, marginTop: 4 }}
-                                  />
+                              <div style={{ marginTop: (msg.text && !msg.text.includes('📷 [Image Attachment]')) ? 8 : 0 }}>
+                                {hasImageAttachment ? (
+                                  <div style={{ maxWidth: 360 }}>
+                                    <a href={msg.file_attachment.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textDecoration: 'none' }}>
+                                      <img
+                                        src={msg.file_attachment.url}
+                                        alt={msg.file_attachment.name || 'Attached Image'}
+                                        style={{
+                                          maxWidth: '100%', maxHeight: 260, borderRadius: 10,
+                                          display: 'block', cursor: 'zoom-in',
+                                          border: isMe ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.1)',
+                                          objectFit: 'contain', background: '#0f172a'
+                                        }}
+                                      />
+                                    </a>
+                                    <div style={{
+                                      fontSize: '0.68rem', opacity: 0.85, marginTop: 4,
+                                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4
+                                    }}>
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        📷 {msg.file_attachment.name || 'Image'}
+                                      </span>
+                                      {msg.file_attachment.size && <span style={{ flexShrink: 0 }}>({msg.file_attachment.size})</span>}
+                                    </div>
+                                  </div>
                                 ) : (
                                   <a
                                     href={msg.file_attachment.url}
                                     download={msg.file_attachment.name}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     style={{
-                                      display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-                                      background: 'rgba(255,255,255,0.15)', borderRadius: 8, color: 'inherit',
-                                      fontSize: '0.78rem', textDecoration: 'none', fontWeight: 600, marginTop: 4
+                                      display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px',
+                                      background: isMe ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)',
+                                      borderRadius: 8, color: 'inherit',
+                                      fontSize: '0.78rem', textDecoration: 'none', fontWeight: 600, marginTop: 4,
+                                      border: '1px solid rgba(255,255,255,0.12)'
                                     }}
                                   >
                                     <Paperclip size={14} /> {msg.file_attachment.name} ({msg.file_attachment.size})
@@ -888,8 +1070,12 @@ export default function TicketDetail({ user }) {
                               </div>
                             )}
                           </div>
-                          <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 3, padding: '0 4px', fontWeight: 500 }}>
-                            {senderLabel} &bull; {timeStr}
+                          <div style={{
+                            fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 3,
+                            padding: '0 4px', fontWeight: 500,
+                            textAlign: isMe ? 'right' : 'left'
+                          }}>
+                            {isMe ? 'You' : senderLabel} &bull; {timeStr}
                           </div>
                         </div>
                       )
@@ -901,11 +1087,33 @@ export default function TicketDetail({ user }) {
 
                 {/* Selected File Preview Chip */}
                 {chatFile && (
-                  <div style={{ padding: '8px 16px', background: 'rgba(59,130,246,0.08)', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--accent)', fontWeight: 600 }}>
-                      <Paperclip size={14} /> Attached: {chatFile.name} ({chatFile.size})
+                  <div style={{
+                    padding: '8px 16px', background: 'rgba(59,130,246,0.1)',
+                    borderTop: '1px solid var(--border)', display: 'flex',
+                    alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--accent)', fontWeight: 600 }}>
+                      {chatFile.url && (chatFile.type?.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(chatFile.name || '')) ? (
+                        <img
+                          src={chatFile.url}
+                          alt="Preview"
+                          style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', border: '1px solid #3b82f6' }}
+                        />
+                      ) : (
+                        <Paperclip size={16} />
+                      )}
+                      <span>Attached: {chatFile.name} ({chatFile.size})</span>
                     </div>
-                    <button type="button" onClick={() => setChatFile(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 700 }}>✕ Remove</button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChatFile(null)
+                        if (chatFileInputRef.current) chatFileInputRef.current.value = ''
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 700 }}
+                    >
+                      ✕ Remove
+                    </button>
                   </div>
                 )}
 
@@ -929,6 +1137,7 @@ export default function TicketDetail({ user }) {
                       type="file"
                       ref={chatFileInputRef}
                       onChange={handleChatFileSelect}
+                      accept="image/*,.pdf,.doc,.docx,.png,.jpg,.jpeg"
                       style={{ display: 'none' }}
                     />
                   </label>

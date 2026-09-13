@@ -7,12 +7,18 @@ import { Upload, Sparkles, CheckCircle, X } from 'lucide-react'
 
 export default function NewTicket({ user }) {
   const navigate = useNavigate()
+  const demoUser = (() => {
+    try { return JSON.parse(localStorage.getItem('demo_user') || '{}') } catch { return {} }
+  })()
+  const activeEmail = (user?.email || demoUser?.email || localStorage.getItem('user_email') || '').toLowerCase().trim()
+  const activeName = demoUser?.name || user?.name || user?.user_metadata?.full_name || (activeEmail ? activeEmail.split('@')[0] : 'Valued Customer')
+
   const [form, setForm] = useState({
     subject: '',
     category: 'Integration Issue',
     description: '',
-    customer_name: user?.name || '',
-    customer_email: user?.email || '',
+    customer_name: activeName,
+    customer_email: activeEmail,
   })
 
   const [files, setFiles] = useState([])
@@ -28,6 +34,8 @@ export default function NewTicket({ user }) {
     try {
       const ticket = await createTicket({
         ...form,
+        customer_email: (form.customer_email || activeEmail || '').toLowerCase().trim(),
+        customer_name: form.customer_name || activeName,
         attachments: files.map(f => ({ name: f.name, size: `${(f.size / 1024).toFixed(1)} KB`, type: f.type }))
       })
       setCreatedTicket(ticket)

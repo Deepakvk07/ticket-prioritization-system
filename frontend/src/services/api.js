@@ -118,25 +118,47 @@ function generateUUID() {
 export const getTickets = async (params = {}) => {
   let supabaseTickets = []
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('tickets')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(params.limit || 100)
+
+    if (params.customer_email) {
+      query = query.ilike('customer_email', params.customer_email.trim())
+    }
+    if (params.assigned_agent) {
+      query = query.ilike('assigned_agent', `%${params.assigned_agent.trim()}%`)
+    }
+    if (params.status) {
+      query = query.eq('status', params.status)
+    }
+    if (params.priority) {
+      query = query.eq('priority', params.priority)
+    }
+
+    const { data, error } = await query
 
     if (!error && Array.isArray(data)) {
       supabaseTickets = data.map(t => {
         const code = t.ticket_code || t.code || `TK-${(t.id || '').substring(0, 5).toUpperCase()}`
         return { ...t, code, ticket_code: code }
       })
-      if (data.length === 0) {
+      if (data.length === 0 && !params.customer_email && !params.status) {
         try { localStorage.removeItem(LOCAL_TICKETS_KEY) } catch {}
       }
     }
   } catch { /* fallback */ }
 
   // Merge Supabase tickets with local tickets
-  const local = getLocalTickets()
+  let local = getLocalTickets()
+  if (params.customer_email) {
+    const cEmail = params.customer_email.toLowerCase().trim()
+    local = local.filter(t => (t.customer_email || '').toLowerCase().trim() === cEmail)
+  }
+  if (params.status) {
+    local = local.filter(t => t.status === params.status)
+  }
   const mergedMap = new Map()
 
   supabaseTickets.forEach(t => {

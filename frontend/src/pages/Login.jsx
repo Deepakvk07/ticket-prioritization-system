@@ -30,12 +30,13 @@ export default function Login() {
           .then(data => {
             if (data && data.email) {
               const googleUser = {
-                email: data.email,
+                email: data.email.trim().toLowerCase(),
                 name: data.name || data.given_name || data.email.split('@')[0],
                 avatar_url: data.picture || null,
                 role: 'customer'
               }
               localStorage.setItem('user_role_mode', 'customer')
+              localStorage.setItem('user_email', googleUser.email)
               localStorage.setItem('demo_user', JSON.stringify(googleUser))
               setSuccess(`Signed in as ${googleUser.name} (${googleUser.email})!`)
               setTimeout(() => {
@@ -69,6 +70,8 @@ export default function Login() {
       }, 500)
     } else {
       localStorage.removeItem('demo_user')
+      localStorage.removeItem('user_email')
+      localStorage.removeItem('user_role_mode')
     }
   }, [navigate])
 
@@ -88,6 +91,8 @@ export default function Login() {
     setError('')
     setSuccess('')
     localStorage.removeItem('demo_user')
+    localStorage.removeItem('user_email')
+    localStorage.removeItem('user_role_mode')
   }
 
   const handleEmailAuth = async (e) => {
@@ -128,7 +133,8 @@ export default function Login() {
       }
 
       localStorage.setItem('user_role_mode', 'customer')
-      localStorage.setItem('demo_user', JSON.stringify({ ...userObj, role: 'customer' }))
+      localStorage.setItem('user_email', userEmail)
+      localStorage.setItem('demo_user', JSON.stringify({ ...userObj, email: userEmail, name: userObj.name || userName, role: 'customer' }))
 
       setSuccess(tab === 'signin' ? 'Sign in successful! Entering customer home...' : 'Account created! Entering customer home...')
       setTimeout(() => {

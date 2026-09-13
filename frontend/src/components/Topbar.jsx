@@ -193,6 +193,7 @@ export default function Topbar({ user, placeholder }) {
 
     localStorage.removeItem('demo_user')
     localStorage.removeItem('user_role_mode')
+    localStorage.removeItem('user_email')
     try { await supabase.auth.signOut() } catch { /* ignore */ }
 
     // Redirect to specific portal based on section / user role

@@ -14,8 +14,11 @@ import {
 export default function HomePage({ user }) {
   const { t, lang } = useTranslation()
   const navigate = useNavigate()
-  const email = user?.email || ''
-  const userName = user?.name || user?.user_metadata?.full_name || (email ? email.split('@')[0] : 'Valued Customer')
+  const demoUser = (() => {
+    try { return JSON.parse(localStorage.getItem('demo_user') || '{}') } catch { return {} }
+  })()
+  const email = (user?.email || demoUser?.email || localStorage.getItem('user_email') || '').toLowerCase().trim()
+  const userName = demoUser?.name || user?.name || user?.user_metadata?.full_name || (email ? email.split('@')[0] : 'Valued Customer')
 
   // Modal Popup Toggle State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -159,7 +162,7 @@ export default function HomePage({ user }) {
         category: category || 'Technical Support',
         product_module: category || 'Technical Support',
         customer_name: userName,
-        customer_email: contactEmail || email || '',
+        customer_email: (contactEmail || email || '').toLowerCase().trim(),
         priority: 'High',
         ai_priority: 'High',
         confidence_score: 90.0,

@@ -51,6 +51,10 @@ export default function Dashboard({ user }) {
   const demoUser = localStorage.getItem('demo_user') ? JSON.parse(localStorage.getItem('demo_user')) : null
   const activeRole = demoUser?.role || localStorage.getItem('user_role_mode') || 'customer'
   const isAdmin = activeRole === 'admin'
+  const isAgent = activeRole === 'agent'
+  const isCustomer = activeRole === 'customer'
+  const currentUserEmail = (user?.email || demoUser?.email || localStorage.getItem('user_email') || '').toLowerCase().trim()
+  const currentUserName = (user?.user_metadata?.full_name || user?.name || demoUser?.name || '').toLowerCase().trim()
 
   useEffect(() => {
     getAgents().then(setRegisteredAgents).catch(() => setRegisteredAgents([]))
@@ -60,7 +64,22 @@ export default function Dashboard({ user }) {
       .finally(() => setLoading(false))
   }, [])
 
-  const sortedTickets = [...tickets].sort((a, b) => {
+  const userTickets = tickets.filter(t => {
+    if (isCustomer) {
+      const tCustEmail = (t.customer_email || '').toLowerCase().trim()
+      const myEmail = (currentUserEmail || '').toLowerCase().trim()
+      return Boolean(myEmail && tCustEmail && tCustEmail === myEmail)
+    }
+    if (isAgent) {
+      if (!t.assigned_agent || t.assigned_agent === 'Unassigned') return false
+      const isDirectlyAssigned = (t.assigned_agent && t.assigned_agent.toLowerCase().includes(demoUser?.name?.toLowerCase() || '___')) ||
+                                 (t.assigned_agent_email && t.assigned_agent_email === demoUser?.email)
+      return isDirectlyAssigned
+    }
+    return true
+  })
+
+  const sortedTickets = [...userTickets].sort((a, b) => {
     const pA = PRIORITY_ORDER[a.priority] || 99
     const pB = PRIORITY_ORDER[b.priority] || 99
     if (pA !== pB) return pA - pB

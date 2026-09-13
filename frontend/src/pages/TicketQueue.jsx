@@ -42,6 +42,9 @@ export default function TicketQueue({ user }) {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
+  const currentUserEmail = (user?.email || demoUser.email || localStorage.getItem('user_email') || '').toLowerCase().trim()
+  const currentUserName = (user?.user_metadata?.full_name || user?.name || demoUser.name || '').toLowerCase().trim()
+  const [customerFilter, setCustomerFilter] = useState('')
   const [autoAssigning, setAutoAssigning] = useState(false)
   const [assignSuccessMsg, setAssignSuccessMsg] = useState('')
   const [selectedTickets, setSelectedTickets] = useState(new Set())
@@ -277,18 +280,43 @@ export default function TicketQueue({ user }) {
     await Promise.all(updatePromises)
   }
 
-  // Filter tickets by agent linkage / department + filters
+  // Unique customer users for Admin filter
+  const uniqueCustomers = Array.from(
+    new Set(
+      tickets.map(t => (t.customer_email || t.customer_name || '').trim()).filter(Boolean)
+    )
+  ).sort()
+
+  // Filter tickets by user role (Customer vs Agent vs Admin) + custom filters
   const filtered = tickets.filter(t => {
     if (statusFilter && t.status !== statusFilter) return false
     if (priorityFilter && t.priority !== priorityFilter) return false
 
-    // If logged in as an Agent, ONLY show tickets explicitly assigned to this agent.
-    // Unassigned tickets are NEVER shown to agents (Admin only until assigned).
+    // 1. Customer Isolation: Customers ONLY see tickets matching their exact authenticated email
+    if (isCustomer) {
+      const tCustEmail = (t.customer_email || '').toLowerCase().trim()
+      const myEmail = (currentUserEmail || '').toLowerCase().trim()
+      if (!myEmail || !tCustEmail || tCustEmail !== myEmail) {
+        return false
+      }
+    }
+
+    // 2. Agent Isolation: Agents ONLY see tickets explicitly assigned to them
     if (isAgent) {
       if (!t.assigned_agent || t.assigned_agent === 'Unassigned') return false
       const isDirectlyAssigned = (t.assigned_agent && t.assigned_agent.toLowerCase().includes(demoUser.name?.toLowerCase() || '___')) ||
                                  (t.assigned_agent_email && t.assigned_agent_email === demoUser.email)
       if (!isDirectlyAssigned) return false
+    }
+
+    // 3. Admin / Staff specific user filter: Filter by specific customer user
+    if (customerFilter) {
+      const cf = customerFilter.toLowerCase().trim()
+      const tCustEmail = (t.customer_email || '').toLowerCase().trim()
+      const tCustName = (t.customer_name || '').toLowerCase().trim()
+      if (!tCustEmail.includes(cf) && !tCustName.includes(cf)) {
+        return false
+      }
     }
 
     return true
@@ -311,9 +339,50 @@ export default function TicketQueue({ user }) {
         <Topbar user={user} placeholder="Search tickets in queue..." />
         <div className="page-body animate-fade">
           <div className="page-header" style={{ marginBottom: 20 }}>
-            <h2>AI-Ranked Ticket Queue</h2>
-            <p>Tickets sorted in strict priority order (Critical → High → Medium → Low) with Admin-to-Agent assignment linkage.</p>
+            <h2>{isCustomer ? 'My Submitted Tickets' : isAgent ? 'Assigned Tickets Queue' : 'AI-Ranked Ticket Queue'}</h2>
+            <p>
+              {isCustomer
+                ? `Showing tickets submitted by ${demoUser.name || user?.user_metadata?.full_name || user?.email || 'you'}. Track status and chat directly with your assigned agent.`
+                : isAgent
+                ? 'Tickets assigned explicitly to your specialist queue sorted by AI urgency.'
+                : 'All enterprise tickets sorted in strict priority order with user filtering and auto-assignment.'}
+            </p>
           </div>
+
+          {/* Customer Privacy & Account Banner */}
+          {isCustomer && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
+              padding: '14px 20px', marginBottom: 20, borderRadius: 12,
+              background: 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(29,78,216,0.04))',
+              border: '1px solid rgba(37,99,235,0.2)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: 10,
+                  background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '1rem', fontWeight: 800
+                }}>
+                  👤
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    My Account: {demoUser.name || user?.user_metadata?.full_name || 'Customer'} {currentUserEmail ? `(${currentUserEmail})` : ''}
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                    🔒 Privacy Protection Active: Showing only tickets submitted by your account.
+                  </div>
+                </div>
+              </div>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => navigate('/home')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+              >
+                + Submit New Ticket
+              </button>
+            </div>
+          )}
 
           {/* Agent Specialist Banner */}
           {isAgent && (
@@ -364,7 +433,7 @@ export default function TicketQueue({ user }) {
           )}
 
           {/* Filters */}
-          <div className="card" style={{ padding: 16, marginBottom: 20, display: 'flex', gap: 16, alignItems: 'center' }}>
+          <div className="card" style={{ padding: 16, marginBottom: 20, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
             <Filter size={16} color="var(--text-muted)" />
             <select
               className="form-select"
@@ -391,6 +460,22 @@ export default function TicketQueue({ user }) {
                 <option value="High">High</option>
                 <option value="Medium">Medium</option>
                 <option value="Low">Low</option>
+              </select>
+            )}
+
+            {/* Filter by Specific Customer User (for Admin / Staff) */}
+            {!isCustomer && (
+              <select
+                className="form-select"
+                style={{ minWidth: 200, maxWidth: 260 }}
+                value={customerFilter}
+                onChange={e => setCustomerFilter(e.target.value)}
+                title="Filter tickets by specific user"
+              >
+                <option value="">👤 All Customer Users ({uniqueCustomers.length})</option>
+                {uniqueCustomers.map(cust => (
+                  <option key={cust} value={cust}>{cust}</option>
+                ))}
               </select>
             )}
 
@@ -736,8 +821,10 @@ export default function TicketQueue({ user }) {
                 </div>
               ) : (
                 agentChatMsgs.map(msg => {
-                  const isMe = msg.sender_email?.toLowerCase() === agentEmail.toLowerCase()
-                  const senderLabel = isMe ? 'You' : 'Administrator'
+                  const sEmail = (msg.sender_email || '').toLowerCase().trim()
+                  const sRole = (msg.author_role || '').toUpperCase()
+                  const isMe = sRole === 'AGENT' || (sEmail && agentEmail && sEmail === agentEmail.toLowerCase().trim())
+                  const senderLabel = isMe ? 'You (Agent)' : 'Administrator'
                   const timeStr = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
 
                   return (
@@ -746,18 +833,21 @@ export default function TicketQueue({ user }) {
                       style={{
                         display: 'flex',
                         flexDirection: 'column',
-                        alignItems: isMe ? 'flex-end' : 'flex-start'
+                        alignItems: isMe ? 'flex-end' : 'flex-start',
+                        alignSelf: isMe ? 'flex-end' : 'flex-start',
+                        width: '100%'
                       }}
                     >
                       <div style={{
                         maxWidth: '82%', padding: '12px 16px', borderRadius: 16,
                         borderBottomRightRadius: isMe ? 4 : 16,
                         borderBottomLeftRadius: !isMe ? 4 : 16,
-                        background: isMe ? 'linear-gradient(135deg, #10b981, #059669)' : '#ffffff',
+                        background: isMe ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : '#ffffff',
                         color: isMe ? '#ffffff' : '#0f172a',
-                        border: isMe ? 'none' : '1px solid #e2e8f0',
-                        boxShadow: isMe ? '0 4px 12px rgba(16,185,129,0.2)' : '0 2px 6px rgba(0,0,0,0.03)',
-                        fontSize: '0.88rem', lineHeight: 1.5
+                        border: isMe ? 'none' : '1px solid #cbd5e1',
+                        boxShadow: isMe ? '0 4px 12px rgba(37,99,235,0.25)' : '0 2px 6px rgba(0,0,0,0.06)',
+                        fontSize: '0.88rem', lineHeight: 1.5,
+                        alignSelf: isMe ? 'flex-end' : 'flex-start'
                       }}>
                         {msg.text && <div>{msg.text}</div>}
                         {msg.file_attachment && (

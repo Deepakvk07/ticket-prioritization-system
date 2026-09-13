@@ -445,8 +445,10 @@ export default function SpecialistAgents({ user }) {
                     </div>
                   ) : (
                     chatMessages.map(msg => {
-                      const isMe = msg.sender_email?.toLowerCase() === adminEmail.toLowerCase()
-                      const senderLabel = isMe ? 'You' : (msg.sender_name || activeChatAgent.name)
+                      const sEmail = (msg.sender_email || '').toLowerCase().trim()
+                      const sRole = (msg.author_role || '').toUpperCase()
+                      const isMe = sRole === 'ADMIN' || (sEmail && adminEmail && sEmail === adminEmail.toLowerCase().trim())
+                      const senderLabel = isMe ? 'You (Admin)' : (msg.sender_name || activeChatAgent.name)
                       const timeStr = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
 
                       return (
@@ -455,7 +457,9 @@ export default function SpecialistAgents({ user }) {
                           style={{
                             display: 'flex',
                             flexDirection: 'column',
-                            alignItems: isMe ? 'flex-end' : 'flex-start'
+                            alignItems: isMe ? 'flex-end' : 'flex-start',
+                            alignSelf: isMe ? 'flex-end' : 'flex-start',
+                            width: '100%'
                           }}
                         >
                           <div style={{
@@ -464,9 +468,10 @@ export default function SpecialistAgents({ user }) {
                             borderBottomLeftRadius: !isMe ? 4 : 16,
                             background: isMe ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : '#ffffff',
                             color: isMe ? '#ffffff' : '#0f172a',
-                            border: isMe ? 'none' : '1px solid #e2e8f0',
-                            boxShadow: isMe ? '0 4px 12px rgba(37,99,235,0.2)' : '0 2px 6px rgba(0,0,0,0.03)',
-                            fontSize: '0.88rem', lineHeight: 1.5
+                            border: isMe ? 'none' : '1px solid #cbd5e1',
+                            boxShadow: isMe ? '0 4px 12px rgba(37,99,235,0.2)' : '0 2px 6px rgba(0,0,0,0.05)',
+                            fontSize: '0.88rem', lineHeight: 1.5,
+                            alignSelf: isMe ? 'flex-end' : 'flex-start'
                           }}>
                             {msg.text && <div>{msg.text}</div>}
                             {msg.file_attachment && (

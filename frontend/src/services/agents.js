@@ -19,35 +19,36 @@ export async function getDirectMessages(myEmail, otherEmail, ticketId) {
   // 1. Fetch from Supabase tickets table for ticketId
   if (ticketId) {
     try {
-      const { data } = await supabase.from('tickets').select('id, activities').eq('id', ticketId).single()
+      const { data } = await supabase
+        .from('tickets')
+        .select('id, activities, customer_email, customer_name, assigned_agent_email, assigned_agent')
+        .eq('id', ticketId)
+        .single()
+
       if (data && Array.isArray(data.activities)) {
+        const ticketCustEmail = normalizeEmail(data.customer_email || 'customer@ticketflow.ai')
+        const ticketAgtEmail = normalizeEmail(data.assigned_agent_email || 'agent@ticketflow.ai')
+
         data.activities.forEach(m => {
-          if (m && (m.text || m.content)) {
-            const msgId = m.id || `act_${m.created_at}`
-            const role = (m.author_role || '').toUpperCase()
-            const isAgent = role === 'AGENT' || (m.author && (m.author.includes('Agent') || m.author.includes('Ved') || m.author.includes('Amar') || m.author.includes('Deepak') || m.author.includes('Siddharth')))
-            const isCust = role === 'CUSTOMER' || (m.author && (m.author.includes('Customer') || m.author.includes('deepakvishwakarma')))
+          if (m && (m.text || m.content || m.file_attachment)) {
+            const msgId = m.id || `act_${m.created_at || Date.now()}`
+            const rawRole = (m.author_role || '').toUpperCase()
+            const isAgent = rawRole === 'AGENT' || (!rawRole && m.author && (m.author.toLowerCase().includes('agent') || m.author.toLowerCase().includes('support')))
+            
+            let sEmail = m.sender_email ? normalizeEmail(m.sender_email) : (isAgent ? ticketAgtEmail : ticketCustEmail)
+            let rEmail = m.receiver_email ? normalizeEmail(m.receiver_email) : (isAgent ? ticketCustEmail : ticketAgtEmail)
 
-            let sEmail = m.sender_email ? normalizeEmail(m.sender_email) : ''
-            if (!sEmail) {
-              if (isAgent) sEmail = email2.includes('@') ? email2 : 'agent@ticketflow.ai'
-              else if (isCust) sEmail = email1.includes('@') ? email1 : 'customer@ticketflow.ai'
-              else sEmail = email1
-            }
-
-            let rEmail = m.receiver_email ? normalizeEmail(m.receiver_email) : ''
-            if (!rEmail) {
-              rEmail = (sEmail === email1) ? email2 : email1
-            }
+            const role = rawRole || (isAgent ? 'AGENT' : 'CUSTOMER')
 
             msgMap.set(msgId, {
               id: msgId,
+              ticket_id: ticketId,
               sender_email: sEmail,
-              sender_name: m.sender_name || m.author || (isAgent ? 'Support Agent' : 'Customer'),
+              sender_name: m.sender_name || m.author || (isAgent ? (data.assigned_agent || 'Support Agent') : (data.customer_name || 'Customer')),
               receiver_email: rEmail,
-              author_role: isAgent ? 'AGENT' : 'CUSTOMER',
-              text: m.text || m.content || '',
-              content: m.text || m.content || '',
+              author_role: role,
+              text: m.text || m.content || (m.file_attachment ? '📷 [Image Attachment]' : ''),
+              content: m.text || m.content || (m.file_attachment ? '📷 [Image Attachment]' : ''),
               file_attachment: m.file_attachment || null,
               created_at: m.created_at || new Date().toISOString()
             })
@@ -59,17 +60,25 @@ export async function getDirectMessages(myEmail, otherEmail, ticketId) {
 
   // 2. Fetch from Supabase ticket_activities table
   try {
-    const { data: actData } = await supabase.from('ticket_activities').select('*')
+    let actQuery = supabase.from('ticket_activities').select('*')
+    if (ticketId) {
+      actQuery = actQuery.eq('ticket_id', ticketId)
+    }
+    const { data: actData } = await actQuery
     if (Array.isArray(actData)) {
       actData.forEach(row => {
         try {
           if (row.content && row.content.startsWith('{')) {
             const parsed = JSON.parse(row.content)
             if (parsed.id && !msgMap.has(parsed.id)) {
-              const s = normalizeEmail(parsed.sender_email)
-              const r = normalizeEmail(parsed.receiver_email)
-              if (!email1 || !email2 || (s === email1 && r === email2) || (s === email2 && r === email1)) {
+              if (ticketId && (row.ticket_id === ticketId || parsed.ticket_id === ticketId)) {
                 msgMap.set(parsed.id, parsed)
+              } else {
+                const s = normalizeEmail(parsed.sender_email)
+                const r = normalizeEmail(parsed.receiver_email)
+                if (!email1 || !email2 || (s === email1 && r === email2) || (s === email2 && r === email1)) {
+                  msgMap.set(parsed.id, parsed)
+                }
               }
             }
           }
@@ -78,13 +87,20 @@ export async function getDirectMessages(myEmail, otherEmail, ticketId) {
     }
   } catch { /* ignore */ }
 
-  // 3. Merge/Fallback to LocalStorage for offline / instant sync (isolated by pairKey)
+  // 3. Merge/Fallback to LocalStorage for offline / instant sync
   try {
+    if (ticketId) {
+      const rawTicket = localStorage.getItem(`tf_ticket_chat_${ticketId}`)
+      const ticketMsgs = rawTicket ? JSON.parse(rawTicket) : []
+      ticketMsgs.forEach(m => {
+        if (m && m.id && !msgMap.has(m.id)) msgMap.set(m.id, m)
+      })
+    }
     if (pairKey && pairKey !== '__') {
       const raw = localStorage.getItem(`tf_pair_chat_${pairKey}`)
       const localMsgs = raw ? JSON.parse(raw) : []
       localMsgs.forEach(m => {
-        if (!msgMap.has(m.id)) msgMap.set(m.id, m)
+        if (m && m.id && !msgMap.has(m.id)) msgMap.set(m.id, m)
       })
     }
   } catch { /* ignore */ }
@@ -140,38 +156,49 @@ export function triggerChatNotification(title, text, targetRecipientEmail) {
   } catch { /* ignore */ }
 }
 
-export async function sendDirectMessage({ senderEmail, senderName, receiverEmail, text, fileAttachment, ticketId }) {
-  const sEmail = (senderEmail || 'admin@ticketflow.ai').trim().toLowerCase()
-  const isAgentSender = sEmail.includes('agent') || sEmail.includes('admin') || sEmail.includes('@ticketflow.ai') || sEmail === 'vedprakash@gmail.com' || sEmail === 'amar@gmail.com' || sEmail === 'deepak@gmail.com' || sEmail === 'siddharth@gmail.com'
-  const role = isAgentSender ? 'AGENT' : 'CUSTOMER'
+export async function sendDirectMessage({ senderEmail, senderName, receiverEmail, text, fileAttachment, ticketId, authorRole }) {
+  const sEmail = (senderEmail || '').trim().toLowerCase()
+  const isAgentSender = sEmail.includes('agent') || sEmail.includes('admin') || sEmail.includes('@ticketflow.ai')
+  const role = authorRole || (isAgentSender ? 'AGENT' : 'CUSTOMER')
+
+  const trimmedText = (text || '').trim()
+  const fallbackText = fileAttachment ? (fileAttachment.type?.startsWith('image/') ? '📷 [Image Attachment]' : `📎 [File: ${fileAttachment.name}]`) : ''
+  const finalContent = trimmedText || fallbackText
 
   const msgObj = {
     id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     ticket_id: ticketId || null,
     sender_email: sEmail,
-    sender_name: senderName || (isAgentSender ? 'Support Agent' : 'Customer'),
+    sender_name: senderName || (role === 'AGENT' ? 'Support Agent' : 'Customer'),
     receiver_email: (receiverEmail || '').trim().toLowerCase(),
     author_role: role,
-    text: (text || '').trim(),
-    content: (text || '').trim(),
+    text: finalContent,
+    content: finalContent,
     file_attachment: fileAttachment || null,
     created_at: new Date().toISOString()
   }
 
-  // 1. Save in isolated pair local cache
+  // 1. Save in ticket-specific and pair local cache
   try {
-    const pairKey = [msgObj.sender_email, msgObj.receiver_email].sort().join('__')
-    const localKey = `tf_pair_chat_${pairKey}`
-    const raw = localStorage.getItem(localKey)
-    const list = raw ? JSON.parse(raw) : []
-    localStorage.setItem(localKey, JSON.stringify([...list, msgObj]))
+    if (ticketId) {
+      const ticketKey = `tf_ticket_chat_${ticketId}`
+      const raw = localStorage.getItem(ticketKey)
+      const list = raw ? JSON.parse(raw) : []
+      localStorage.setItem(ticketKey, JSON.stringify([...list, msgObj]))
+    }
+    const pairKey = [msgObj.sender_email, msgObj.receiver_email].filter(Boolean).sort().join('__')
+    if (pairKey) {
+      const localKey = `tf_pair_chat_${pairKey}`
+      const raw = localStorage.getItem(localKey)
+      const list = raw ? JSON.parse(raw) : []
+      localStorage.setItem(localKey, JSON.stringify([...list, msgObj]))
+    }
   } catch { /* ignore */ }
 
   // 2. Persist to Supabase tickets.activities array so ALL devices receive it live
   try {
     let targetTicketId = ticketId
-    if (!targetTicketId) {
-      // Find ticket matching sender/receiver email
+    if (!targetTicketId && msgObj.sender_email) {
       const { data: found } = await supabase.from('tickets').select('id, activities').or(`customer_email.ilike.${msgObj.sender_email},customer_email.ilike.${msgObj.receiver_email}`).limit(1)
       if (Array.isArray(found) && found.length > 0) {
         targetTicketId = found[0].id
@@ -185,7 +212,9 @@ export async function sendDirectMessage({ senderEmail, senderName, receiverEmail
         await supabase.from('tickets').update({ activities: updatedActivities }).eq('id', targetTicketId)
       }
     }
-  } catch { /* fallback */ }
+  } catch (err) {
+    console.warn('Supabase tickets activity update note:', err)
+  }
 
   // 3. Also insert into ticket_activities table in Supabase
   try {
@@ -194,11 +223,13 @@ export async function sendDirectMessage({ senderEmail, senderName, receiverEmail
       ticket_id: ticketId || 'global',
       type: 'message',
       author: msgObj.sender_name,
-      author_role: 'CHAT',
+      author_role: role,
       content: JSON.stringify(msgObj),
       created_at: msgObj.created_at
     }])
-  } catch { /* fallback */ }
+  } catch (err) {
+    console.warn('Supabase ticket_activities insert note:', err)
+  }
 
   // Trigger Notification ONLY for the recipient (NOT for sender)
   const notifText = fileAttachment ? `📎 Attached file: ${fileAttachment.name}` : text

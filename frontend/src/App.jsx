@@ -36,9 +36,28 @@ function getSafeDemoUser() {
   }
 }
 
-function AuthGate({ children, user, loading }) {
+function getActiveUser(supabaseUser) {
   const demoUser = getSafeDemoUser()
-  const currentUser = user || demoUser || { email: 'customer@ticketflow.ai', name: 'Valued Customer', role: 'customer' }
+  if (demoUser && demoUser.email) {
+    return {
+      ...demoUser,
+      email: demoUser.email.trim().toLowerCase(),
+      name: demoUser.name || demoUser.email.split('@')[0],
+      role: demoUser.role || 'customer'
+    }
+  }
+  if (supabaseUser && supabaseUser.email) {
+    return {
+      email: supabaseUser.email.trim().toLowerCase(),
+      name: supabaseUser.user_metadata?.full_name || supabaseUser.email.split('@')[0],
+      role: supabaseUser.user_metadata?.role || 'customer'
+    }
+  }
+  return null
+}
+
+function AuthGate({ children, user, loading }) {
+  const currentUser = getActiveUser(user)
 
   if (loading && !currentUser) {
     return (
@@ -61,8 +80,7 @@ function AuthGate({ children, user, loading }) {
 }
 
 function withUser(Component, user) {
-  const demoUser = getSafeDemoUser()
-  const activeUser = user || demoUser || { email: 'customer@ticketflow.ai', name: 'Valued Customer', role: 'customer' }
+  const activeUser = getActiveUser(user) || { email: '', name: 'Customer', role: 'customer' }
   return <Component user={activeUser} />
 }
 
