@@ -26,7 +26,8 @@ function generateUuid() {
 
 function normalizeEmail(email) {
   let e = (email || '').trim().toLowerCase()
-  if (e === 'ved@gmail.com') return 'vedprakash@gmail.com'
+  if (e === 'ved@gmail.com' || e === 'vedprakash@gmail.com') return 'vedprakashprajapati003@gmail.com'
+  if (e === 'deepak@gmail.com') return 'deepakvishwakarma9532@gmail.com'
   return e
 }
 
@@ -46,7 +47,11 @@ export async function getDirectMessages(myEmail, otherEmail, ticketId) {
     r = normalizeEmail(r)
 
     if (isChatWithAdmin) {
-      return (isAdminEmail(s) && r === agentEmailInPair) || (s === agentEmailInPair && isAdminEmail(r))
+      const normAgent = normalizeEmail(agentEmailInPair)
+      const isAgentSender = (s === normAgent) || (normAgent && (normAgent.includes(s) || s.includes(normAgent)))
+      const isAgentReceiver = (r === normAgent) || (normAgent && (normAgent.includes(r) || r.includes(normAgent)))
+
+      return (isAdminEmail(s) && isAgentReceiver) || (isAgentSender && isAdminEmail(r))
     }
 
     return (s === email1 && r === email2) || (s === email2 && r === email1)
@@ -127,12 +132,13 @@ export async function getDirectMessages(myEmail, otherEmail, ticketId) {
   // 3. If direct admin-agent chat, also fetch from SYSTEM_TICKET_ID activities
   if (!ticketId || ticketId === SYSTEM_TICKET_ID) {
     try {
-      const { data: sysTicket } = await supabase
+      const { data: sysTicket, error: sysErr } = await supabase
         .from('tickets')
         .select('activities')
         .eq('id', SYSTEM_TICKET_ID)
-        .single()
-      if (sysTicket && Array.isArray(sysTicket.activities)) {
+        .maybeSingle()
+
+      if (!sysErr && sysTicket && Array.isArray(sysTicket.activities)) {
         sysTicket.activities.forEach(m => {
           if (m && m.id && !msgMap.has(m.id)) {
             if (matchesPair(m.sender_email, m.receiver_email)) {
@@ -144,7 +150,7 @@ export async function getDirectMessages(myEmail, otherEmail, ticketId) {
     } catch { /* ignore */ }
   }
 
-  // 4. Merge/Fallback to LocalStorage for offline / instant sync
+  // 4. Merge/Fallback to LocalStorage for offline / instant same-browser sync
   try {
     if (ticketId) {
       const rawTicket = localStorage.getItem(`tf_ticket_chat_${ticketId}`)
@@ -163,6 +169,27 @@ export async function getDirectMessages(myEmail, otherEmail, ticketId) {
           }
         }
       })
+    }
+    // Also scan any active pair chat keys in localStorage to prevent loss if casing or key order differs
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith('tf_pair_chat_')) {
+        const raw = localStorage.getItem(k)
+        if (raw) {
+          try {
+            const list = JSON.parse(raw)
+            if (Array.isArray(list)) {
+              list.forEach(m => {
+                if (m && m.id && !msgMap.has(m.id)) {
+                  if (matchesPair(m.sender_email, m.receiver_email)) {
+                    msgMap.set(m.id, m)
+                  }
+                }
+              })
+            }
+          } catch { /* ignore */ }
+        }
+      }
     }
   } catch { /* ignore */ }
 
@@ -283,12 +310,32 @@ export async function sendDirectMessage({ senderEmail, senderName, receiverEmail
     console.warn('Supabase ticket_activities insert error:', err)
   }
 
-  // 3. Also persist to Supabase tickets.activities array on targetTicketId
+  // 3. Primary reliable persistence to Supabase tickets.activities array on targetTicketId
   try {
-    const { data: t } = await supabase.from('tickets').select('activities').eq('id', targetTicketId).single()
-    if (t) {
-      const updatedActivities = [...(t.activities || []), msgObj]
-      await supabase.from('tickets').update({ activities: updatedActivities }).eq('id', targetTicketId)
+    const { data: t, error: fetchErr } = await supabase
+      .from('tickets')
+      .select('activities')
+      .eq('id', targetTicketId)
+      .maybeSingle()
+
+    if (fetchErr) {
+      console.warn('Supabase ticket fetch note:', fetchErr.message)
+    }
+
+    const currentActivities = (t && Array.isArray(t.activities)) ? t.activities : []
+    if (!currentActivities.some(m => m && m.id === msgObj.id)) {
+      const updatedActivities = [...currentActivities, msgObj]
+      const { error: updateErr } = await supabase
+        .from('tickets')
+        .update({
+          activities: updatedActivities,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', targetTicketId)
+
+      if (updateErr) {
+        console.warn('Supabase tickets activities update error:', updateErr.message)
+      }
     }
   } catch (err) {
     console.warn('Supabase tickets activity update note:', err)

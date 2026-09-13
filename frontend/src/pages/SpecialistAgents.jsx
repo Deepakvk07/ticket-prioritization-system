@@ -32,7 +32,11 @@ export default function SpecialistAgents({ user }) {
   const [sending, setSending] = useState(false)
   const chatEndRef = useRef(null)
 
-  const adminEmail = user?.email || localStorage.getItem('user_email') || 'ticketflowai@gmail.com'
+  const adminEmail = (user?.email && isAdminEmail(user.email))
+    ? user.email.toLowerCase().trim()
+    : (isAdminEmail(localStorage.getItem('admin_email'))
+        ? localStorage.getItem('admin_email').toLowerCase().trim()
+        : 'ticketflowai@gmail.com')
 
   useEffect(() => {
     // Load agents from Supabase
@@ -62,6 +66,7 @@ export default function SpecialistAgents({ user }) {
 
     loadRealMessages()
     const interval = setInterval(loadRealMessages, 2000)
+    window.addEventListener('storage', loadRealMessages)
 
     const channel = supabase
       .channel(`admin_chat_${activeChatAgent.id || 'all'}`)
@@ -76,6 +81,7 @@ export default function SpecialistAgents({ user }) {
     return () => {
       isMounted = false
       clearInterval(interval)
+      window.removeEventListener('storage', loadRealMessages)
       supabase.removeChannel(channel)
     }
   }, [activeChatAgent, adminEmail])
@@ -144,6 +150,7 @@ export default function SpecialistAgents({ user }) {
         if (prev.some(m => m.id === sentMsg.id)) return prev
         return [...prev, sentMsg]
       })
+      window.dispatchEvent(new Event('storage'))
     } catch (err) {
       console.error('Failed to send message:', err)
     } finally {
@@ -489,9 +496,9 @@ export default function SpecialistAgents({ user }) {
                             fontSize: '0.88rem', lineHeight: 1.5,
                             alignSelf: isMe ? 'flex-end' : 'flex-start'
                           }}>
-                            {msg.text && <div>{msg.text}</div>}
+                            {(msg.text || msg.content) && <div>{msg.text || msg.content}</div>}
                             {msg.file_attachment && (
-                              <div style={{ marginTop: msg.text ? 8 : 0 }}>
+                              <div style={{ marginTop: (msg.text || msg.content) ? 8 : 0 }}>
                                 {msg.file_attachment.type?.startsWith('image/') ? (
                                   <img
                                     src={msg.file_attachment.url}

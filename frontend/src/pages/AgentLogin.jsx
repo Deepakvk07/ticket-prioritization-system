@@ -94,8 +94,13 @@ export default function AgentLogin() {
       }
 
       // Persist session to localStorage for this portal session
+      const cleanEmail = (agentObj.email || email).trim().toLowerCase()
+      const cleanName = agentObj.name || fullName || 'Support Agent'
       localStorage.setItem('user_role_mode', 'agent')
-      localStorage.setItem('demo_user', JSON.stringify({ ...agentObj, role: 'agent', status: 'Online' }))
+      localStorage.setItem('user_email', cleanEmail)
+      localStorage.setItem('agent_email', cleanEmail)
+      localStorage.setItem('agent_name', cleanName)
+      localStorage.setItem('demo_user', JSON.stringify({ ...agentObj, email: cleanEmail, name: cleanName, role: 'agent', status: 'Online' }))
 
       setSuccess(tab === 'signin' ? 'Sign in successful! Loading agent queue...' : 'Agent account registered! Entering workspace...')
       setTimeout(() => {

@@ -148,11 +148,16 @@ export default function AdminLogin() {
     setError('')
     setSuccess('✅ 2-Step Security Verification Passed! Entering Admin Portal...')
 
+    const cleanEmail = (adminUser.email || email).trim().toLowerCase()
+    const cleanName = adminUser.name || 'System Administrator'
     localStorage.setItem('user_role_mode', 'admin')
+    localStorage.setItem('user_email', cleanEmail)
+    localStorage.setItem('admin_email', cleanEmail)
+    localStorage.setItem('admin_name', cleanName)
     localStorage.setItem('demo_user', JSON.stringify({
-      email: adminUser.email,
+      email: cleanEmail,
       role: 'admin',
-      name: adminUser.name
+      name: cleanName
     }))
 
     setTimeout(() => {

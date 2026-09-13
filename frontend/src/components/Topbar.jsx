@@ -194,6 +194,10 @@ export default function Topbar({ user, placeholder }) {
     localStorage.removeItem('demo_user')
     localStorage.removeItem('user_role_mode')
     localStorage.removeItem('user_email')
+    localStorage.removeItem('agent_email')
+    localStorage.removeItem('admin_email')
+    localStorage.removeItem('agent_name')
+    localStorage.removeItem('admin_name')
     localStorage.removeItem('tf_my_ticket_ids')
     localStorage.removeItem('tf_local_tickets')
     try { await supabase.auth.signOut() } catch { /* ignore */ }

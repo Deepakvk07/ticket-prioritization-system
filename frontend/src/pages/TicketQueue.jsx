@@ -35,8 +35,14 @@ export default function TicketQueue({ user }) {
   const isCustomer = activeRole === 'customer' || (!isAgent && !isAdmin)
   const agentDepartment = demoUser.department || ''
 
-  const agentEmail = (demoUser.email || user?.email || 'agent@ticketflow.ai').toLowerCase()
-  const agentName = demoUser.name || user?.user_metadata?.full_name || 'Support Agent'
+  const agentEmail = (
+    demoUser.email ||
+    user?.email ||
+    localStorage.getItem('agent_email') ||
+    localStorage.getItem('user_email') ||
+    'agent@ticketflow.ai'
+  ).toLowerCase().trim()
+  const agentName = demoUser.name || user?.user_metadata?.full_name || localStorage.getItem('agent_name') || 'Support Agent'
 
   const [tickets, setTickets] = useState([])
   const [registeredAgents, setRegisteredAgents] = useState([])
@@ -92,6 +98,7 @@ export default function TicketQueue({ user }) {
 
     loadRealAgentMessages()
     const interval = setInterval(loadRealAgentMessages, 2000)
+    window.addEventListener('storage', loadRealAgentMessages)
 
     const channel = supabase
       .channel(`agent_admin_chat_${agentEmail}`)
@@ -106,6 +113,7 @@ export default function TicketQueue({ user }) {
     return () => {
       isMounted = false
       clearInterval(interval)
+      window.removeEventListener('storage', loadRealAgentMessages)
       supabase.removeChannel(channel)
     }
   }, [showAdminChatModal, isAgent, agentEmail])
@@ -151,6 +159,7 @@ export default function TicketQueue({ user }) {
         if (prev.some(m => m.id === sentMsg.id)) return prev
         return [...prev, sentMsg]
       })
+      window.dispatchEvent(new Event('storage'))
     } catch (err) {
       console.error('Failed to send agent reply:', err)
     } finally {
@@ -846,9 +855,9 @@ export default function TicketQueue({ user }) {
                         fontSize: '0.88rem', lineHeight: 1.5,
                         alignSelf: isMe ? 'flex-end' : 'flex-start'
                       }}>
-                        {msg.text && <div>{msg.text}</div>}
+                        {(msg.text || msg.content) && <div>{msg.text || msg.content}</div>}
                         {msg.file_attachment && (
-                          <div style={{ marginTop: msg.text ? 8 : 0 }}>
+                          <div style={{ marginTop: (msg.text || msg.content) ? 8 : 0 }}>
                             {msg.file_attachment.type?.startsWith('image/') ? (
                               <img
                                 src={msg.file_attachment.url}
