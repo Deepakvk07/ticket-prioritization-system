@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets, updateTicket, getSynchronizedPriorityAndScore } from '../services/api'
-import { getAgents, getMatchingAgentsForTicket, getDirectMessages, sendDirectMessage } from '../services/agents'
+import { getAgents, getMatchingAgentsForTicket, getDirectMessages, sendDirectMessage, isAdminEmail } from '../services/agents'
 import { canCustomerViewTicket } from '../services/authHelper'
 import { supabase } from '../lib/supabase'
 import { Filter, ChevronRight, ShieldCheck, Layers, UserCheck, Download, Zap, Sparkles, CheckCircle2, MessageSquare, Send, X, RefreshCw, Paperclip } from 'lucide-react'
@@ -74,14 +74,16 @@ export default function TicketQueue({ user }) {
     reader.readAsDataURL(file)
   }
 
-  // Poll for real incoming admin messages every 2 seconds when chat is open
+  const targetAdminEmail = 'ticketflowai@gmail.com'
+
+  // Poll and listen for real incoming admin messages when chat is open
   useEffect(() => {
     if (!showAdminChatModal || !isAgent) return
     let isMounted = true
 
     const loadRealAgentMessages = async () => {
       try {
-        const msgs = await getDirectMessages(agentEmail, 'admin@ticketflow.ai')
+        const msgs = await getDirectMessages(agentEmail, targetAdminEmail)
         if (isMounted) {
           setAgentChatMsgs(msgs)
         }
@@ -91,9 +93,20 @@ export default function TicketQueue({ user }) {
     loadRealAgentMessages()
     const interval = setInterval(loadRealAgentMessages, 2000)
 
+    const channel = supabase
+      .channel(`agent_admin_chat_${agentEmail}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_activities' }, () => {
+        loadRealAgentMessages()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
+        loadRealAgentMessages()
+      })
+      .subscribe()
+
     return () => {
       isMounted = false
       clearInterval(interval)
+      supabase.removeChannel(channel)
     }
   }, [showAdminChatModal, isAgent, agentEmail])
 
@@ -108,7 +121,7 @@ export default function TicketQueue({ user }) {
   const openAdminChatDrawer = async () => {
     setShowAdminChatModal(true)
     try {
-      const msgs = await getDirectMessages(agentEmail, 'admin@ticketflow.ai')
+      const msgs = await getDirectMessages(agentEmail, targetAdminEmail)
       setAgentChatMsgs(msgs)
     } catch {
       setAgentChatMsgs([])
@@ -128,12 +141,16 @@ export default function TicketQueue({ user }) {
     try {
       const sentMsg = await sendDirectMessage({
         senderEmail: agentEmail,
-        senderName: agentName,
-        receiverEmail: 'admin@ticketflow.ai',
+        senderName: agentName || 'Support Agent',
+        receiverEmail: targetAdminEmail,
+        authorRole: 'AGENT',
         text: textToSend,
         fileAttachment: fileToSend
       })
-      setAgentChatMsgs(prev => [...prev, sentMsg])
+      setAgentChatMsgs(prev => {
+        if (prev.some(m => m.id === sentMsg.id)) return prev
+        return [...prev, sentMsg]
+      })
     } catch (err) {
       console.error('Failed to send agent reply:', err)
     } finally {
@@ -803,7 +820,7 @@ export default function TicketQueue({ user }) {
                 agentChatMsgs.map(msg => {
                   const sEmail = (msg.sender_email || '').toLowerCase().trim()
                   const sRole = (msg.author_role || '').toUpperCase()
-                  const isMe = sRole === 'AGENT' || (sEmail && agentEmail && sEmail === agentEmail.toLowerCase().trim())
+                  const isMe = sRole === 'AGENT' || (!isAdminEmail(sEmail) && sEmail && agentEmail && sEmail === agentEmail.toLowerCase().trim())
                   const senderLabel = isMe ? 'You (Agent)' : 'Administrator'
                   const timeStr = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
 

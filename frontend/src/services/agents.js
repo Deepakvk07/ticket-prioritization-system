@@ -1,5 +1,29 @@
 import { supabase } from '../lib/supabase'
 
+export const SYSTEM_TICKET_ID = '00000000-0000-0000-0000-000000000001'
+
+export function isAdminEmail(email) {
+  if (!email) return false
+  const e = email.toLowerCase().trim()
+  return (
+    e === 'ticketflowai@gmail.com' ||
+    e === 'admin@ticketflow.ai' ||
+    e.includes('admin') ||
+    e.startsWith('admin')
+  )
+}
+
+function generateUuid() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 function normalizeEmail(email) {
   let e = (email || '').trim().toLowerCase()
   if (e === 'ved@gmail.com') return 'vedprakash@gmail.com'
@@ -13,11 +37,26 @@ export async function getDirectMessages(myEmail, otherEmail, ticketId) {
   const email1 = normalizeEmail(myEmail)
   const email2 = normalizeEmail(otherEmail)
 
+  const isChatWithAdmin = isAdminEmail(email1) || isAdminEmail(email2)
+  const agentEmailInPair = isAdminEmail(email1) ? email2 : email1
+
+  const matchesPair = (s, r) => {
+    if (!s || !r) return false
+    s = normalizeEmail(s)
+    r = normalizeEmail(r)
+
+    if (isChatWithAdmin) {
+      return (isAdminEmail(s) && r === agentEmailInPair) || (s === agentEmailInPair && isAdminEmail(r))
+    }
+
+    return (s === email1 && r === email2) || (s === email2 && r === email1)
+  }
+
   const pairKey = [email1, email2].sort().join('__')
   const msgMap = new Map()
 
   // 1. Fetch from Supabase tickets table for ticketId
-  if (ticketId) {
+  if (ticketId && ticketId !== SYSTEM_TICKET_ID) {
     try {
       const { data } = await supabase
         .from('tickets')
@@ -61,8 +100,10 @@ export async function getDirectMessages(myEmail, otherEmail, ticketId) {
   // 2. Fetch from Supabase ticket_activities table
   try {
     let actQuery = supabase.from('ticket_activities').select('*')
-    if (ticketId) {
+    if (ticketId && ticketId !== SYSTEM_TICKET_ID) {
       actQuery = actQuery.eq('ticket_id', ticketId)
+    } else {
+      actQuery = actQuery.eq('ticket_id', SYSTEM_TICKET_ID)
     }
     const { data: actData } = await actQuery
     if (Array.isArray(actData)) {
@@ -70,15 +111,11 @@ export async function getDirectMessages(myEmail, otherEmail, ticketId) {
         try {
           if (row.content && row.content.startsWith('{')) {
             const parsed = JSON.parse(row.content)
-            if (parsed.id && !msgMap.has(parsed.id)) {
+            if (parsed && parsed.id && !msgMap.has(parsed.id)) {
               if (ticketId && (row.ticket_id === ticketId || parsed.ticket_id === ticketId)) {
                 msgMap.set(parsed.id, parsed)
-              } else {
-                const s = normalizeEmail(parsed.sender_email)
-                const r = normalizeEmail(parsed.receiver_email)
-                if (!email1 || !email2 || (s === email1 && r === email2) || (s === email2 && r === email1)) {
-                  msgMap.set(parsed.id, parsed)
-                }
+              } else if (matchesPair(parsed.sender_email, parsed.receiver_email)) {
+                msgMap.set(parsed.id, parsed)
               }
             }
           }
@@ -87,7 +124,27 @@ export async function getDirectMessages(myEmail, otherEmail, ticketId) {
     }
   } catch { /* ignore */ }
 
-  // 3. Merge/Fallback to LocalStorage for offline / instant sync
+  // 3. If direct admin-agent chat, also fetch from SYSTEM_TICKET_ID activities
+  if (!ticketId || ticketId === SYSTEM_TICKET_ID) {
+    try {
+      const { data: sysTicket } = await supabase
+        .from('tickets')
+        .select('activities')
+        .eq('id', SYSTEM_TICKET_ID)
+        .single()
+      if (sysTicket && Array.isArray(sysTicket.activities)) {
+        sysTicket.activities.forEach(m => {
+          if (m && m.id && !msgMap.has(m.id)) {
+            if (matchesPair(m.sender_email, m.receiver_email)) {
+              msgMap.set(m.id, m)
+            }
+          }
+        })
+      }
+    } catch { /* ignore */ }
+  }
+
+  // 4. Merge/Fallback to LocalStorage for offline / instant sync
   try {
     if (ticketId) {
       const rawTicket = localStorage.getItem(`tf_ticket_chat_${ticketId}`)
@@ -100,7 +157,11 @@ export async function getDirectMessages(myEmail, otherEmail, ticketId) {
       const raw = localStorage.getItem(`tf_pair_chat_${pairKey}`)
       const localMsgs = raw ? JSON.parse(raw) : []
       localMsgs.forEach(m => {
-        if (m && m.id && !msgMap.has(m.id)) msgMap.set(m.id, m)
+        if (m && m.id && !msgMap.has(m.id)) {
+          if (matchesPair(m.sender_email, m.receiver_email)) {
+            msgMap.set(m.id, m)
+          }
+        }
       })
     }
   } catch { /* ignore */ }
@@ -158,19 +219,28 @@ export function triggerChatNotification(title, text, targetRecipientEmail) {
 
 export async function sendDirectMessage({ senderEmail, senderName, receiverEmail, text, fileAttachment, ticketId, authorRole }) {
   const sEmail = (senderEmail || '').trim().toLowerCase()
-  const isAgentSender = sEmail.includes('agent') || sEmail.includes('admin') || sEmail.includes('@ticketflow.ai')
-  const role = authorRole || (isAgentSender ? 'AGENT' : 'CUSTOMER')
+  const rEmail = (receiverEmail || '').trim().toLowerCase()
+
+  let role = authorRole
+  if (!role) {
+    if (isAdminEmail(sEmail)) role = 'ADMIN'
+    else if (sEmail.includes('agent') || sEmail.includes('vedprakash') || sEmail.includes('deepak')) role = 'AGENT'
+    else role = 'CUSTOMER'
+  }
 
   const trimmedText = (text || '').trim()
   const fallbackText = fileAttachment ? (fileAttachment.type?.startsWith('image/') ? '📷 [Image Attachment]' : `📎 [File: ${fileAttachment.name}]`) : ''
   const finalContent = trimmedText || fallbackText
 
+  const validMsgId = generateUuid()
+  const targetTicketId = ticketId || SYSTEM_TICKET_ID
+
   const msgObj = {
-    id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    ticket_id: ticketId || null,
+    id: validMsgId,
+    ticket_id: targetTicketId,
     sender_email: sEmail,
-    sender_name: senderName || (role === 'AGENT' ? 'Support Agent' : 'Customer'),
-    receiver_email: (receiverEmail || '').trim().toLowerCase(),
+    sender_name: senderName || (role === 'ADMIN' ? 'Administrator' : role === 'AGENT' ? 'Support Agent' : 'Customer'),
+    receiver_email: rEmail,
     author_role: role,
     text: finalContent,
     content: finalContent,
@@ -180,13 +250,13 @@ export async function sendDirectMessage({ senderEmail, senderName, receiverEmail
 
   // 1. Save in ticket-specific and pair local cache
   try {
-    if (ticketId) {
+    if (ticketId && ticketId !== SYSTEM_TICKET_ID) {
       const ticketKey = `tf_ticket_chat_${ticketId}`
       const raw = localStorage.getItem(ticketKey)
       const list = raw ? JSON.parse(raw) : []
       localStorage.setItem(ticketKey, JSON.stringify([...list, msgObj]))
     }
-    const pairKey = [msgObj.sender_email, msgObj.receiver_email].filter(Boolean).sort().join('__')
+    const pairKey = [sEmail, rEmail].filter(Boolean).sort().join('__')
     if (pairKey) {
       const localKey = `tf_pair_chat_${pairKey}`
       const raw = localStorage.getItem(localKey)
@@ -195,45 +265,38 @@ export async function sendDirectMessage({ senderEmail, senderName, receiverEmail
     }
   } catch { /* ignore */ }
 
-  // 2. Persist to Supabase tickets.activities array so ALL devices receive it live
+  // 2. Persist to Supabase ticket_activities table (strictly valid UUIDs and foreign keys!)
   try {
-    let targetTicketId = ticketId
-    if (!targetTicketId && msgObj.sender_email) {
-      const { data: found } = await supabase.from('tickets').select('id, activities').or(`customer_email.ilike.${msgObj.sender_email},customer_email.ilike.${msgObj.receiver_email}`).limit(1)
-      if (Array.isArray(found) && found.length > 0) {
-        targetTicketId = found[0].id
-      }
-    }
-
-    if (targetTicketId) {
-      const { data: t } = await supabase.from('tickets').select('activities').eq('id', targetTicketId).single()
-      if (t) {
-        const updatedActivities = [...(t.activities || []), msgObj]
-        await supabase.from('tickets').update({ activities: updatedActivities }).eq('id', targetTicketId)
-      }
-    }
-  } catch (err) {
-    console.warn('Supabase tickets activity update note:', err)
-  }
-
-  // 3. Also insert into ticket_activities table in Supabase
-  try {
-    await supabase.from('ticket_activities').insert([{
-      id: msgObj.id,
-      ticket_id: ticketId || 'global',
+    const { error: actErr } = await supabase.from('ticket_activities').insert([{
+      id: validMsgId,
+      ticket_id: targetTicketId,
       type: 'message',
       author: msgObj.sender_name,
       author_role: role,
       content: JSON.stringify(msgObj),
       created_at: msgObj.created_at
     }])
+    if (actErr) {
+      console.warn('ticket_activities insert note:', actErr.message)
+    }
   } catch (err) {
-    console.warn('Supabase ticket_activities insert note:', err)
+    console.warn('Supabase ticket_activities insert error:', err)
   }
 
-  // Trigger Notification ONLY for the recipient (NOT for sender)
+  // 3. Also persist to Supabase tickets.activities array on targetTicketId
+  try {
+    const { data: t } = await supabase.from('tickets').select('activities').eq('id', targetTicketId).single()
+    if (t) {
+      const updatedActivities = [...(t.activities || []), msgObj]
+      await supabase.from('tickets').update({ activities: updatedActivities }).eq('id', targetTicketId)
+    }
+  } catch (err) {
+    console.warn('Supabase tickets activity update note:', err)
+  }
+
+  // 4. Trigger Notification ONLY for the recipient (NOT for sender)
   const notifText = fileAttachment ? `📎 Attached file: ${fileAttachment.name}` : text
-  triggerChatNotification(`💬 New Message from ${senderName || 'TicketFlow AI'}`, notifText, msgObj.receiver_email)
+  triggerChatNotification(`💬 New Message from ${senderName || 'TicketFlow AI'}`, notifText, rEmail)
 
   return msgObj
 }

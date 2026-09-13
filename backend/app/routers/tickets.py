@@ -49,7 +49,7 @@ async def list_tickets(
     offset: int = Query(0, ge=0),
 ):
     supabase = get_supabase()
-    query = supabase.table("tickets").select("*").order("created_at", desc=True).range(offset, offset + limit - 1)
+    query = supabase.table("tickets").select("*").neq("id", "00000000-0000-0000-0000-000000000001").order("created_at", desc=True).range(offset, offset + limit - 1)
     if status:
         query = query.eq("status", status)
     if priority:

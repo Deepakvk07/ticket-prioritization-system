@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets } from '../services/api'
-import { getAgents, removeAgent, getDirectMessages, sendDirectMessage } from '../services/agents'
+import { getAgents, removeAgent, getDirectMessages, sendDirectMessage, isAdminEmail } from '../services/agents'
+import { supabase } from '../lib/supabase'
 import { Headphones, Mail, Layers, UserPlus, Trash2, Calendar, MessageSquare, Send, X, RefreshCw, Paperclip } from 'lucide-react'
 
 const DEPT_COLORS = {
@@ -31,7 +32,7 @@ export default function SpecialistAgents({ user }) {
   const [sending, setSending] = useState(false)
   const chatEndRef = useRef(null)
 
-  const adminEmail = user?.email || 'admin@ticketflow.ai'
+  const adminEmail = user?.email || localStorage.getItem('user_email') || 'ticketflowai@gmail.com'
 
   useEffect(() => {
     // Load agents from Supabase
@@ -62,9 +63,20 @@ export default function SpecialistAgents({ user }) {
     loadRealMessages()
     const interval = setInterval(loadRealMessages, 2000)
 
+    const channel = supabase
+      .channel(`admin_chat_${activeChatAgent.id || 'all'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_activities' }, () => {
+        loadRealMessages()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
+        loadRealMessages()
+      })
+      .subscribe()
+
     return () => {
       isMounted = false
       clearInterval(interval)
+      supabase.removeChannel(channel)
     }
   }, [activeChatAgent, adminEmail])
 
@@ -124,10 +136,14 @@ export default function SpecialistAgents({ user }) {
         senderEmail: adminEmail,
         senderName: 'Administrator',
         receiverEmail: activeChatAgent.email,
+        authorRole: 'ADMIN',
         text: textToSend,
         fileAttachment: fileToSend
       })
-      setChatMessages(prev => [...prev, sentMsg])
+      setChatMessages(prev => {
+        if (prev.some(m => m.id === sentMsg.id)) return prev
+        return [...prev, sentMsg]
+      })
     } catch (err) {
       console.error('Failed to send message:', err)
     } finally {
@@ -447,7 +463,7 @@ export default function SpecialistAgents({ user }) {
                     chatMessages.map(msg => {
                       const sEmail = (msg.sender_email || '').toLowerCase().trim()
                       const sRole = (msg.author_role || '').toUpperCase()
-                      const isMe = sRole === 'ADMIN' || (sEmail && adminEmail && sEmail === adminEmail.toLowerCase().trim())
+                      const isMe = sRole === 'ADMIN' || isAdminEmail(sEmail) || (sEmail && adminEmail && sEmail === adminEmail.toLowerCase().trim())
                       const senderLabel = isMe ? 'You (Admin)' : (msg.sender_name || activeChatAgent.name)
                       const timeStr = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
 

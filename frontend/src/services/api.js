@@ -146,10 +146,12 @@ export const getTickets = async (params = {}) => {
     const { data, error } = await query
 
     if (!error && Array.isArray(data)) {
-      supabaseTickets = data.map(t => {
-        const code = t.ticket_code || t.code || `TK-${(t.id || '').substring(0, 5).toUpperCase()}`
-        return { ...t, code, ticket_code: code }
-      })
+      supabaseTickets = data
+        .filter(t => t.id !== '00000000-0000-0000-0000-000000000001' && !t.subject?.startsWith('__ADMIN_AGENT'))
+        .map(t => {
+          const code = t.ticket_code || t.code || `TK-${(t.id || '').substring(0, 5).toUpperCase()}`
+          return { ...t, code, ticket_code: code }
+        })
 
       // Keep local storage cache strictly in sync with Supabase
       try {
