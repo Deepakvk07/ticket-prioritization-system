@@ -238,40 +238,7 @@ export async function sendDirectMessage({ senderEmail, senderName, receiverEmail
   return msgObj
 }
 
-export const DEFAULT_AGENTS = [
-  {
-    name: 'Amar',
-    email: 'amar@gmail.com',
-    department: 'Database & Infrastructure',
-    password_hash: 'amar123',
-    status: 'Online',
-    registered_at: new Date().toISOString()
-  },
-  {
-    name: 'Deepak',
-    email: 'deepak@gmail.com',
-    department: 'Web & UI/UX',
-    password_hash: 'deepak123',
-    status: 'Online',
-    registered_at: new Date().toISOString()
-  },
-  {
-    name: 'Ved Prakash',
-    email: 'vedprakash@gmail.com',
-    department: 'Billing & Integrations',
-    password_hash: 'ved123',
-    status: 'Online',
-    registered_at: new Date().toISOString()
-  },
-  {
-    name: 'Siddharth',
-    email: 'siddharth@gmail.com',
-    department: 'API & Security',
-    password_hash: 'siddharth123',
-    status: 'Online',
-    registered_at: new Date().toISOString()
-  }
-]
+export const DEFAULT_AGENTS = []
 
 export async function getAgents() {
   try {
@@ -280,12 +247,12 @@ export async function getAgents() {
       .select('*')
       .order('registered_at', { ascending: false })
 
-    if (!error && Array.isArray(data) && data.length > 0) {
+    if (!error && Array.isArray(data)) {
       return data
     }
   } catch { /* fallback */ }
 
-  return DEFAULT_AGENTS
+  return []
 }
 
 /**
