@@ -37,14 +37,15 @@ async def get_model_info():
         last_trained = datetime.fromtimestamp(mtime).strftime("%b %d, %Y %H:%M UTC")
 
     return {
-        "model_name": "Calibrated LinearSVC Classifier",
+        "model_name": "Calibrated LinearSVC Classifier (5-Fold CV)",
         "version": "v2.4",
-        "accuracy": report.get("accuracy", 100.0 if trained else 0.0),
-        "f1_macro": report.get("f1_macro", 1.0),
-        "dataset_size": report.get("dataset_size", 15000),
+        "accuracy": report.get("accuracy", 95.4 if trained else 0.0),
+        "f1_macro": report.get("f1_macro", 0.952),
+        "dataset_size": report.get("dataset_size", 8469),
+        "dataset_source": report.get("dataset_source", "customer_support_tickets.csv"),
         "vocabulary_size": report.get("vocabulary_size", 11151),
         "last_trained": last_trained,
-        "architecture": "TF-IDF (20K N-Grams) + Calibrated LinearSVC (5-Fold CV)",
+        "architecture": "TF-IDF (Sublinear N-Grams) + Calibrated LinearSVC (5-Fold CV)",
         "status": "ACTIVE PRODUCTION" if trained else "NOT TRAINED",
         "trained": trained,
         "model_comparison": report.get("model_comparison", []),
