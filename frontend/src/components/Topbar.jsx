@@ -194,6 +194,8 @@ export default function Topbar({ user, placeholder }) {
     localStorage.removeItem('demo_user')
     localStorage.removeItem('user_role_mode')
     localStorage.removeItem('user_email')
+    localStorage.removeItem('tf_my_ticket_ids')
+    localStorage.removeItem('tf_local_tickets')
     try { await supabase.auth.signOut() } catch { /* ignore */ }
 
     // Redirect to specific portal based on section / user role

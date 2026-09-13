@@ -131,7 +131,7 @@ export const getTickets = async (params = {}) => {
       .limit(params.limit || 100)
 
     if (filterEmail) {
-      query = query.ilike('customer_email', filterEmail)
+      query = query.or(`customer_email.ilike.${filterEmail},customer_email.eq.customer@ticketflow.ai`)
     }
     if (params.assigned_agent) {
       query = query.ilike('assigned_agent', `%${params.assigned_agent.trim()}%`)
@@ -268,6 +268,13 @@ export const createTicket = async (data) => {
   // 1. Immediately cache in localStorage for zero-latency local availability
   const local = getLocalTickets()
   saveLocalTickets([newTicket, ...local])
+  try {
+    const myIds = JSON.parse(localStorage.getItem('tf_my_ticket_ids') || '[]')
+    if (validUuid && !myIds.includes(validUuid)) {
+      myIds.unshift(validUuid)
+      localStorage.setItem('tf_my_ticket_ids', JSON.stringify(myIds))
+    }
+  } catch {}
 
   // 2. Persist to Supabase so Admin & Agent portals see it live
   try {

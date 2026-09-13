@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { createTicket, uploadToImgBB } from '../services/api'
+import { addMyTicketId } from '../services/authHelper'
 import { useTranslation } from '../lib/i18n'
 import {
   Sparkles, PlusCircle, CheckCircle2, AlertCircle,
@@ -31,6 +32,12 @@ export default function HomePage({ user }) {
   const [category, setCategory] = useState('Technical Support')
   const [description, setDescription] = useState('')
   const [contactEmail, setContactEmail] = useState(email)
+  const [contactName, setContactName] = useState(userName)
+
+  useEffect(() => {
+    if (email && !contactEmail) setContactEmail(email)
+    if (userName && userName !== 'Valued Customer' && !contactName) setContactName(userName)
+  }, [email, userName])
   const [files, setFiles] = useState([])
   const [dragOver, setDragOver] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
@@ -156,13 +163,16 @@ export default function HomePage({ user }) {
         })
       )
 
+      const finalEmail = (contactEmail || email || '').toLowerCase().trim()
+      const finalName = (contactName || userName || 'Customer').trim()
+
       const payload = {
         subject: subject,
         description: description,
         category: category || 'Technical Support',
         product_module: category || 'Technical Support',
-        customer_name: userName,
-        customer_email: (contactEmail || email || '').toLowerCase().trim(),
+        customer_name: finalName,
+        customer_email: finalEmail || 'customer@ticketflow.ai',
         priority: 'High',
         ai_priority: 'High',
         confidence_score: 90.0,
@@ -170,6 +180,16 @@ export default function HomePage({ user }) {
       }
 
       const ticket = await createTicket(payload)
+      if (ticket?.id) {
+        addMyTicketId(ticket.id)
+      }
+      if (finalEmail) {
+        localStorage.setItem('user_email', finalEmail)
+        if (!localStorage.getItem('demo_user')) {
+          localStorage.setItem('demo_user', JSON.stringify({ email: finalEmail, name: finalName, role: 'customer' }))
+        }
+      }
+
       const ticketIdCode = ticket.code || (ticket.id ? (ticket.id.length < 10 ? ticket.id.toUpperCase() : `TK-${ticket.id.slice(0, 5).toUpperCase()}`) : generatedCode)
 
       setSubmittedTicket({
@@ -458,6 +478,33 @@ export default function HomePage({ user }) {
 
                 {/* Form */}
                 <form onSubmit={handleSubmit}>
+                  {/* Customer Identity Fields */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                    <div>
+                      <label className="modal-field-label">Your Name</label>
+                      <input
+                        id="ticket-name-input"
+                        type="text"
+                        className="modal-input"
+                        placeholder="John Doe"
+                        value={contactName}
+                        onChange={e => setContactName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="modal-field-label">Your Email *</label>
+                      <input
+                        id="ticket-email-input"
+                        type="email"
+                        className="modal-input"
+                        placeholder="name@company.com"
+                        value={contactEmail}
+                        onChange={e => setContactEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
                   {/* Subject Field */}
                   <div style={{ marginBottom: 20 }}>
                     <label className="modal-field-label">{t('ticket_subject_req')}</label>

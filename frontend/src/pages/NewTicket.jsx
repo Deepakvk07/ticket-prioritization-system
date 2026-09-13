@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { createTicket } from '../services/api'
+import { addMyTicketId } from '../services/authHelper'
 import { Upload, Sparkles, CheckCircle, X } from 'lucide-react'
 
 export default function NewTicket({ user }) {
@@ -32,12 +33,26 @@ export default function NewTicket({ user }) {
     setSubmitting(true)
 
     try {
+      const finalEmail = (form.customer_email || activeEmail || '').toLowerCase().trim()
+      const finalName = form.customer_name || activeName || 'Customer'
+
       const ticket = await createTicket({
         ...form,
-        customer_email: (form.customer_email || activeEmail || '').toLowerCase().trim(),
-        customer_name: form.customer_name || activeName,
+        customer_email: finalEmail || 'customer@ticketflow.ai',
+        customer_name: finalName,
         attachments: files.map(f => ({ name: f.name, size: `${(f.size / 1024).toFixed(1)} KB`, type: f.type }))
       })
+
+      if (ticket?.id) {
+        addMyTicketId(ticket.id)
+      }
+      if (finalEmail) {
+        localStorage.setItem('user_email', finalEmail)
+        if (!localStorage.getItem('demo_user')) {
+          localStorage.setItem('demo_user', JSON.stringify({ email: finalEmail, name: finalName, role: 'customer' }))
+        }
+      }
+
       setCreatedTicket(ticket)
       const targetId = ticket?.id || ticket?.ticket_code || 'TK-8842-UX'
       setTimeout(() => navigate(`/tickets/${targetId}`), 1000)
@@ -133,6 +148,18 @@ export default function NewTicket({ user }) {
                     placeholder="John Doe"
                   />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Your Email Address *</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={form.customer_email}
+                  onChange={e => setForm(f => ({ ...f, customer_email: e.target.value }))}
+                  placeholder="name@company.com"
+                  required
+                />
               </div>
 
               <div className="form-group">

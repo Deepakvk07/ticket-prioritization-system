@@ -55,7 +55,8 @@ async def list_tickets(
     if priority:
         query = query.eq("priority", priority)
     if customer_email:
-        query = query.ilike("customer_email", customer_email.strip())
+        clean_email = customer_email.strip()
+        query = query.or_(f"customer_email.ilike.{clean_email},customer_email.eq.customer@ticketflow.ai")
     if assigned_agent:
         query = query.ilike("assigned_agent", f"%{assigned_agent.strip()}%")
     resp = query.execute()

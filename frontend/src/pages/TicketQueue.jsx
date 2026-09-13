@@ -4,6 +4,7 @@ import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets, updateTicket, getSynchronizedPriorityAndScore } from '../services/api'
 import { getAgents, getMatchingAgentsForTicket, getDirectMessages, sendDirectMessage } from '../services/agents'
+import { canCustomerViewTicket } from '../services/authHelper'
 import { supabase } from '../lib/supabase'
 import { Filter, ChevronRight, ShieldCheck, Layers, UserCheck, Download, Zap, Sparkles, CheckCircle2, MessageSquare, Send, X, RefreshCw, Paperclip } from 'lucide-react'
 
@@ -297,11 +298,9 @@ export default function TicketQueue({ user }) {
     if (statusFilter && t.status !== statusFilter) return false
     if (priorityFilter && t.priority !== priorityFilter) return false
 
-    // 1. Customer Isolation: Customers ONLY see tickets matching their exact authenticated email
+    // 1. Customer Isolation: Customers ONLY see tickets matching their exact authenticated email or created in their session
     if (isCustomer) {
-      const tCustEmail = (t.customer_email || '').toLowerCase().trim()
-      const myEmail = (currentUserEmail || '').toLowerCase().trim()
-      if (!myEmail || !tCustEmail || tCustEmail !== myEmail) {
+      if (!canCustomerViewTicket(t, currentUserEmail)) {
         return false
       }
     }

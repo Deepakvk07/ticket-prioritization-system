@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTicket, addActivity, updateTicket, uploadToImgBB } from '../services/api'
+import { canCustomerViewTicket } from '../services/authHelper'
 import { getTicketRating, saveTicketRating } from '../services/admins'
 import { getDirectMessages, sendDirectMessage } from '../services/agents'
 import { ChevronRight, Paperclip, Send, ArrowLeft, X, Eye, FileText, Image as ImageIcon, Download, Star, RotateCcw, FileDown, CheckCircle2, Clock, AlertCircle, Loader, Sparkles, MessageSquare, RefreshCw } from 'lucide-react'
@@ -495,9 +496,7 @@ export default function TicketDetail({ user }) {
     )
   }
 
-  const isOwner = !isCustomer || (
-    Boolean(currentUserEmail && ticketCustomerEmail && currentUserEmail === ticketCustomerEmail)
-  )
+  const isOwner = !isCustomer || canCustomerViewTicket(ticket, currentUserEmail)
 
   if (!isOwner) {
     return (

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets } from '../services/api'
+import { canCustomerViewTicket } from '../services/authHelper'
 import { useTranslation } from '../lib/i18n'
 import { Clock, ChevronRight, Search, CalendarDays, CheckCircle2, XCircle, Layers, Filter, Download } from 'lucide-react'
 
@@ -52,11 +53,9 @@ export default function TicketHistory({ user }) {
     const isResolved = ['Resolved', 'Closed'].includes(t.status)
     if (!isResolved) return false
 
-    // Customer filter: ONLY show tickets submitted by this customer matching exact authenticated email
+    // Customer filter: ONLY show tickets submitted by this customer matching exact authenticated email or session
     if (isCustomer) {
-      const tCustEmail = (t.customer_email || '').toLowerCase().trim()
-      const myEmail = (currentUserEmail || '').toLowerCase().trim()
-      if (!myEmail || !tCustEmail || tCustEmail !== myEmail) return false
+      if (!canCustomerViewTicket(t, currentUserEmail)) return false
     }
 
     // Agent filter: ONLY show tickets assigned explicitly to this agent

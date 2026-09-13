@@ -68,10 +68,6 @@ export default function Login() {
         navigate('/home')
         window.location.reload()
       }, 500)
-    } else {
-      localStorage.removeItem('demo_user')
-      localStorage.removeItem('user_email')
-      localStorage.removeItem('user_role_mode')
     }
   }, [navigate])
 

@@ -5,6 +5,7 @@ import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getTickets, updateTicket, getSynchronizedPriorityAndScore } from '../services/api'
 import { getAgents, getMatchingAgentsForTicket } from '../services/agents'
+import { canCustomerViewTicket } from '../services/authHelper'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { useTranslation } from '../lib/i18n'
 
@@ -67,9 +68,7 @@ export default function Dashboard({ user }) {
 
   const userTickets = tickets.filter(t => {
     if (isCustomer) {
-      const tCustEmail = (t.customer_email || '').toLowerCase().trim()
-      const myEmail = (currentUserEmail || '').toLowerCase().trim()
-      return Boolean(myEmail && tCustEmail && tCustEmail === myEmail)
+      return canCustomerViewTicket(t, currentUserEmail)
     }
     if (isAgent) {
       if (!t.assigned_agent || t.assigned_agent === 'Unassigned') return false
