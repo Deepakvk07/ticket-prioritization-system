@@ -93,11 +93,13 @@ export default function TicketQueue({ user }) {
     }
   }, [showAdminChatModal, isAgent, agentEmail])
 
+  const queueChatBoxRef = useRef(null)
+
   useEffect(() => {
-    if (showAdminChatModal) {
-      agentChatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (queueChatBoxRef.current && showAdminChatModal && agentChatMsgs.length > 0) {
+      queueChatBoxRef.current.scrollTop = queueChatBoxRef.current.scrollHeight
     }
-  }, [agentChatMsgs, showAdminChatModal])
+  }, [agentChatMsgs.length, showAdminChatModal])
 
   const openAdminChatDrawer = async () => {
     setShowAdminChatModal(true)
@@ -223,7 +225,7 @@ export default function TicketQueue({ user }) {
     } catch {}
   }
 
-  // 1-Click Problem-Based Auto-Assign Engine
+  // 1-Click Problem-Based High-Speed Parallel Auto-Assign Engine
   const handleAutoAssignAll = async () => {
     if (registeredAgents.length === 0) {
       alert('No agents registered in Supabase DB yet. Please register specialist agents first in Agent Management.')
@@ -237,29 +239,42 @@ export default function TicketQueue({ user }) {
     }
 
     setAutoAssigning(true)
-    let count = 0
 
-    for (let i = 0; i < unassignedList.length; i++) {
-      const t = unassignedList[i]
+    // Build assignment mapping for instant UI update
+    const assignmentMap = new Map()
+
+    const updatePromises = unassignedList.map((t, i) => {
       const matchingAgents = getMatchingAgentsForTicket(t, registeredAgents)
       const targetAgent = matchingAgents[i % matchingAgents.length] || registeredAgents[0]
 
-      if (targetAgent) {
-        await updateTicket(t.id, {
-          assigned_agent: targetAgent.name,
-          assigned_agent_email: targetAgent.email,
-          assigned_department: targetAgent.department,
-          status: 'In Progress'
-        }).catch(() => null)
-        count++
-      }
-    }
+      if (!targetAgent) return null
 
-    const updated = await getTickets()
-    setTickets(Array.isArray(updated) ? updated : [])
+      const updateData = {
+        assigned_agent: targetAgent.name,
+        assigned_agent_email: targetAgent.email,
+        assigned_department: targetAgent.department,
+        status: 'In Progress'
+      }
+
+      assignmentMap.set(t.id, updateData)
+
+      return updateTicket(t.id, updateData).catch(() => null)
+    }).filter(Boolean)
+
+    // 1. INSTANT optimistic UI update (0ms latency!)
+    setTickets(prev => prev.map(t => {
+      if (assignmentMap.has(t.id)) {
+        return { ...t, ...assignmentMap.get(t.id) }
+      }
+      return t
+    }))
+
     setAutoAssigning(false)
-    setAssignSuccessMsg(`⚡ Auto-assigned ${count} ticket(s) to matching specialist agents!`)
+    setAssignSuccessMsg(`⚡ Instant Auto-Assigned ${updatePromises.length} ticket(s) to matching specialist agents!`)
     setTimeout(() => setAssignSuccessMsg(''), 4500)
+
+    // 2. Parallel network persistence in background
+    await Promise.all(updatePromises)
   }
 
   // Filter tickets by agent linkage / department + filters
@@ -699,7 +714,7 @@ export default function TicketQueue({ user }) {
             </div>
 
             {/* Messages Body */}
-            <div style={{
+            <div ref={queueChatBoxRef} style={{
               flex: 1, padding: 20, overflowY: 'auto', background: '#f8fafc',
               display: 'flex', flexDirection: 'column', gap: 14
             }}>

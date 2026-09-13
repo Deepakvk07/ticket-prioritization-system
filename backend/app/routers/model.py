@@ -47,6 +47,8 @@ async def get_model_info():
         "architecture": "TF-IDF (20K N-Grams) + Calibrated LinearSVC (5-Fold CV)",
         "status": "ACTIVE PRODUCTION" if trained else "NOT TRAINED",
         "trained": trained,
+        "model_comparison": report.get("model_comparison", []),
+        "faculty_conclusion": report.get("faculty_conclusion", ""),
     }
 
 

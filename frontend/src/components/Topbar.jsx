@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Bell, HelpCircle, Sun, Moon, X, Ticket, CheckCircle2, AlertCircle, LayoutDashboard, Headphones, BarChart2, Cpu, Home, LogOut, Zap, Menu } from 'lucide-react'
+import { Search, Bell, HelpCircle, Sun, Moon, X, Ticket, CheckCircle2, AlertCircle, LayoutDashboard, Headphones, BarChart2, Cpu, Home, LogOut, Zap, Menu, MessageSquare, Trash2 } from 'lucide-react'
 import { useNavigate, useLocation, NavLink } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useTranslation } from '../lib/i18n'
@@ -60,15 +60,100 @@ export default function Topbar({ user, placeholder }) {
     localStorage.setItem('tf_theme', isDark ? 'dark' : 'light')
   }, [isDark])
 
+  // Live Supabase notification sync: fetch all tickets & activities continuously
   useEffect(() => {
-    if (notifications.length === 0) {
-      const seeded = [
-        { id: 1, icon: 'ticket', title: 'Ticket Submitted', text: 'Your ticket has been received and is being triaged.', time: 'Just now', read: false },
-        { id: 2, icon: 'ai', title: 'AI Triage Complete', text: 'Neural priority classifier predicted ticket priority.', time: '5m ago', read: false },
-        { id: 3, icon: 'check', title: 'System Operational', text: 'All TicketFlow AI services running normally.', time: '1h ago', read: true },
-      ]
-      setNotifications(seeded)
-      saveNotifications(seeded)
+    let isMounted = true
+
+    const loadLiveNotifications = async () => {
+      try {
+        const localNotifs = getNotifications()
+        const { data: tickets } = await supabase
+          .from('tickets')
+          .select('id, subject, priority, status, created_at, customer_name, customer_email, activities')
+          .order('created_at', { ascending: false })
+          .limit(25)
+
+        if (isMounted && Array.isArray(tickets)) {
+          const liveNotifs = []
+          tickets.forEach(t => {
+            const tTime = t.created_at ? new Date(t.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently'
+            const isUrgent = t.priority === 'CRITICAL' || t.priority === 'HIGH'
+            const cEmail = (t.customer_email || '').toLowerCase()
+
+            // 1. Ticket Creation Notification:
+            // Admin and Agents get notified of incoming tickets; Customer does not get self-notified
+            if (activeRole !== 'customer') {
+              liveNotifs.push({
+                id: `t_${t.id}`,
+                ticketId: t.id,
+                icon: isUrgent ? 'urgent' : 'ticket',
+                title: `${t.priority || 'NEW'} Ticket: ${t.subject ? t.subject.slice(0, 32) : 'Untitled'}`,
+                text: `From ${t.customer_name || t.customer_email || 'Customer'} • Status: ${t.status || 'OPEN'}`,
+                time: tTime,
+                read: false,
+                link: `/ticket/${t.id}`
+              })
+            }
+
+            // 2. Chat Activity Notifications:
+            if (Array.isArray(t.activities)) {
+              t.activities.slice(-3).forEach(act => {
+                if (act && (act.text || act.content)) {
+                  const actSender = (act.sender_email || '').toLowerCase()
+                  const actRole = (act.author_role || '').toUpperCase()
+                  const actAuthor = (act.author || act.sender_name || '').toLowerCase()
+
+                  const isSentByAdmin = actRole === 'ADMIN' || actSender === 'admin@ticketflow.ai' || actSender === 'ticketflowai@gmail.com' || actAuthor.includes('admin')
+                  const isSentByAgent = actRole === 'AGENT' || actSender.includes('agent') || ['vedprakash@gmail.com', 'amar@gmail.com', 'deepak@gmail.com', 'siddharth@gmail.com'].includes(actSender)
+                  const isSentByCustomer = actRole === 'CUSTOMER' || actSender === cEmail || actSender.includes('customer')
+
+                  let isSelfAction = false
+                  if (activeRole === 'admin') {
+                    isSelfAction = isSentByAdmin || actSender === currentUserEmail
+                  } else if (activeRole === 'agent') {
+                    isSelfAction = (isSentByAgent && (actSender === currentUserEmail || actSender === 'vedprakash@gmail.com')) || actSender === currentUserEmail
+                  } else {
+                    isSelfAction = isSentByCustomer || actSender === currentUserEmail
+                  }
+
+                  // ONLY notify if action was performed by SOMEONE ELSE
+                  if (!isSelfAction) {
+                    const actTime = act.created_at ? new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+                    liveNotifs.push({
+                      id: act.id || `act_${act.created_at}`,
+                      ticketId: t.id,
+                      icon: 'chat',
+                      title: `Message from ${act.sender_name || act.author || 'User'}`,
+                      text: (act.text || act.content).slice(0, 42) + '...',
+                      time: actTime,
+                      read: false,
+                      link: `/ticket/${t.id}`
+                    })
+                  }
+                }
+              })
+            }
+          })
+
+          const map = new Map()
+          localNotifs.forEach(n => map.set(String(n.id), n))
+          liveNotifs.forEach(n => {
+            if (!map.has(String(n.id))) map.set(String(n.id), n)
+          })
+
+          const combined = Array.from(map.values())
+          setNotifications(combined)
+          saveNotifications(combined)
+        }
+      } catch { /* ignore */ }
+    }
+
+    loadLiveNotifications()
+    const interval = setInterval(loadLiveNotifications, 4000)
+
+    return () => {
+      isMounted = false
+      clearInterval(interval)
     }
   }, [])
 
@@ -90,8 +175,14 @@ export default function Topbar({ user, placeholder }) {
     saveNotifications(updated)
   }
 
-  const removeNotif = (id) => {
-    const updated = notifications.filter(n => n.id !== id)
+  const clearAllNotifs = () => {
+    setNotifications([])
+    saveNotifications([])
+  }
+
+  const removeNotif = (id, e) => {
+    if (e) e.stopPropagation()
+    const updated = notifications.filter(n => String(n.id) !== String(id))
     setNotifications(updated)
     saveNotifications(updated)
   }
@@ -276,40 +367,57 @@ export default function Topbar({ user, placeholder }) {
 
           {showNotifs && (
             <div style={{
-              position: 'absolute', top: 44, right: 0, width: 320, zIndex: 2000,
+              position: 'absolute', top: 44, right: 0, width: 360, zIndex: 2000,
               background: 'var(--bg-surface)', border: '1px solid var(--border-active)',
               boxShadow: '0 16px 40px rgba(0,0,0,0.5)', borderRadius: 14, overflow: 'hidden'
             }}>
               <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                  Notifications {unreadCount > 0 && <span style={{ background: '#ef4444', borderRadius: 10, padding: '1px 6px', fontSize: '0.7rem', marginLeft: 4, color: '#fff' }}>{unreadCount}</span>}
+                <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  Notifications ({notifications.length})
+                  {unreadCount > 0 && <span style={{ background: '#ef4444', borderRadius: 10, padding: '1px 6px', fontSize: '0.7rem', color: '#fff', fontWeight: 700 }}>{unreadCount} new</span>}
                 </span>
-                <button onClick={markAllRead} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '0.76rem', cursor: 'pointer', fontWeight: 600 }}>Mark read</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button onClick={markAllRead} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '0.76rem', cursor: 'pointer', fontWeight: 600 }}>Mark read</button>
+                  <button onClick={clearAllNotifs} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.76rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Trash2 size={12} /> Clear
+                  </button>
+                </div>
               </div>
 
-              <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+              <div style={{ maxHeight: 380, overflowY: 'auto' }}>
                 {notifications.length === 0 ? (
-                  <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                  <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
                     No notifications
                   </div>
                 ) : (
                   notifications.map(n => (
-                    <div key={n.id} style={{
-                      padding: '10px 14px', borderBottom: '1px solid var(--border)',
-                      background: n.read ? 'transparent' : 'rgba(59,130,246,0.05)',
-                      display: 'flex', gap: 10, alignItems: 'flex-start'
-                    }}>
-                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div
+                      key={n.id}
+                      onClick={() => {
+                        if (n.link) {
+                          setShowNotifs(false)
+                          navigate(n.link)
+                        }
+                      }}
+                      style={{
+                        padding: '12px 14px', borderBottom: '1px solid var(--border)',
+                        background: n.read ? 'transparent' : 'rgba(59,130,246,0.06)',
+                        display: 'flex', gap: 10, alignItems: 'flex-start', cursor: n.link ? 'pointer' : 'default',
+                        transition: 'background 0.15s ease'
+                      }}
+                    >
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
                         {getIcon(n.icon)}
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-primary)', marginBottom: 2 }}>
-                          {n.title}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title}</span>
+                          {n.time && <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 500, flexShrink: 0, marginLeft: 6 }}>{n.time}</span>}
                         </div>
-                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>{n.text}</div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.35, wordBreak: 'break-word' }}>{n.text}</div>
                       </div>
-                      <button onClick={() => removeNotif(n.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                        <X size={12} />
+                      <button onClick={(e) => removeNotif(n.id, e)} title="Dismiss" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }}>
+                        <X size={13} />
                       </button>
                     </div>
                   ))

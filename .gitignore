@@ -28,9 +28,10 @@ backend/*/*/__pycache__/
 # IDE & System
 .vscode/
 .idea/
+.claude/
 .DS_Store
 Thumbs.db
 
-customer_support_tickets.csv
+/customer_support_tickets.csv
 *.pkl
 *.log

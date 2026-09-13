@@ -1,54 +1,113 @@
 import { supabase } from '../lib/supabase'
 
-/**
- * Real Direct Messaging Service with Strict Person-Pair Chat Isolation
- */
-export async function getDirectMessages(myEmail, otherEmail) {
-  const email1 = (myEmail || '').trim().toLowerCase()
-  const email2 = (otherEmail || '').trim().toLowerCase()
+function normalizeEmail(email) {
+  let e = (email || '').trim().toLowerCase()
+  if (e === 'ved@gmail.com') return 'vedprakash@gmail.com'
+  return e
+}
 
-  if (!email1 || !email2) return []
+/**
+ * Real Direct Messaging Service with Strict Person-Pair Chat Isolation & Cross-Device Supabase Sync
+ */
+export async function getDirectMessages(myEmail, otherEmail, ticketId) {
+  const email1 = normalizeEmail(myEmail)
+  const email2 = normalizeEmail(otherEmail)
 
   const pairKey = [email1, email2].sort().join('__')
-  let messages = []
+  const msgMap = new Map()
 
-  // 1. Try Supabase agent_messages table with strict pair filtering
-  try {
-    const { data, error } = await supabase
-      .from('agent_messages')
-      .select('*')
-      .or(`and(sender_email.ilike.${email1},receiver_email.ilike.${email2}),and(sender_email.ilike.${email2},receiver_email.ilike.${email1})`)
-      .order('created_at', { ascending: true })
+  // 1. Fetch from Supabase tickets table for ticketId
+  if (ticketId) {
+    try {
+      const { data } = await supabase.from('tickets').select('id, activities').eq('id', ticketId).single()
+      if (data && Array.isArray(data.activities)) {
+        data.activities.forEach(m => {
+          if (m && (m.text || m.content)) {
+            const msgId = m.id || `act_${m.created_at}`
+            const role = (m.author_role || '').toUpperCase()
+            const isAgent = role === 'AGENT' || (m.author && (m.author.includes('Agent') || m.author.includes('Ved') || m.author.includes('Amar') || m.author.includes('Deepak') || m.author.includes('Siddharth')))
+            const isCust = role === 'CUSTOMER' || (m.author && (m.author.includes('Customer') || m.author.includes('deepakvishwakarma')))
 
-    if (!error && Array.isArray(data)) {
-      messages = data
-    }
-  } catch { /* fallback */ }
+            let sEmail = m.sender_email ? normalizeEmail(m.sender_email) : ''
+            if (!sEmail) {
+              if (isAgent) sEmail = email2.includes('@') ? email2 : 'agent@ticketflow.ai'
+              else if (isCust) sEmail = email1.includes('@') ? email1 : 'customer@ticketflow.ai'
+              else sEmail = email1
+            }
 
-  // 2. Merge/Fallback to LocalStorage for offline / instant sync (isolated by pairKey)
-  try {
-    const raw = localStorage.getItem(`tf_pair_chat_${pairKey}`)
-    const localMsgs = raw ? JSON.parse(raw) : []
-    const map = new Map()
-    messages.forEach(m => map.set(m.id, m))
-    localMsgs.forEach(m => {
-      // Ensure only messages strictly between email1 and email2 are included
-      const s = (m.sender_email || '').toLowerCase()
-      const r = (m.receiver_email || '').toLowerCase()
-      if ((s === email1 && r === email2) || (s === email2 && r === email1)) {
-        if (!map.has(m.id)) map.set(m.id, m)
+            let rEmail = m.receiver_email ? normalizeEmail(m.receiver_email) : ''
+            if (!rEmail) {
+              rEmail = (sEmail === email1) ? email2 : email1
+            }
+
+            msgMap.set(msgId, {
+              id: msgId,
+              sender_email: sEmail,
+              sender_name: m.sender_name || m.author || (isAgent ? 'Support Agent' : 'Customer'),
+              receiver_email: rEmail,
+              author_role: isAgent ? 'AGENT' : 'CUSTOMER',
+              text: m.text || m.content || '',
+              content: m.text || m.content || '',
+              file_attachment: m.file_attachment || null,
+              created_at: m.created_at || new Date().toISOString()
+            })
+          }
+        })
       }
-    })
-    return Array.from(map.values()).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-  } catch {
-    return messages
+    } catch { /* ignore */ }
   }
+
+  // 2. Fetch from Supabase ticket_activities table
+  try {
+    const { data: actData } = await supabase.from('ticket_activities').select('*')
+    if (Array.isArray(actData)) {
+      actData.forEach(row => {
+        try {
+          if (row.content && row.content.startsWith('{')) {
+            const parsed = JSON.parse(row.content)
+            if (parsed.id && !msgMap.has(parsed.id)) {
+              const s = normalizeEmail(parsed.sender_email)
+              const r = normalizeEmail(parsed.receiver_email)
+              if (!email1 || !email2 || (s === email1 && r === email2) || (s === email2 && r === email1)) {
+                msgMap.set(parsed.id, parsed)
+              }
+            }
+          }
+        } catch { /* ignore */ }
+      })
+    }
+  } catch { /* ignore */ }
+
+  // 3. Merge/Fallback to LocalStorage for offline / instant sync (isolated by pairKey)
+  try {
+    if (pairKey && pairKey !== '__') {
+      const raw = localStorage.getItem(`tf_pair_chat_${pairKey}`)
+      const localMsgs = raw ? JSON.parse(raw) : []
+      localMsgs.forEach(m => {
+        if (!msgMap.has(m.id)) msgMap.set(m.id, m)
+      })
+    }
+  } catch { /* ignore */ }
+
+  return Array.from(msgMap.values()).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
 }
 
 /**
  * Helper to trigger topbar notification bell and browser Desktop Notification
+ * Only triggers if targetRecipientEmail matches active user email (prevents self-notification)
  */
-export function triggerChatNotification(title, text) {
+export function triggerChatNotification(title, text, targetRecipientEmail) {
+  const activeUser = (() => {
+    try { return JSON.parse(localStorage.getItem('demo_user') || '{}') } catch { return {} }
+  })()
+  const activeUserEmail = (activeUser.email || localStorage.getItem('user_email') || '').toLowerCase()
+  const targetEmail = (targetRecipientEmail || '').toLowerCase()
+
+  // If target recipient email is specified, ONLY trigger notification if the active user is the recipient!
+  if (targetEmail && activeUserEmail && activeUserEmail !== targetEmail) {
+    return
+  }
+
   // 1. Add to Topbar Notification Bell Storage
   try {
     const rawNotifs = localStorage.getItem('tf_notifications') || '[]'
@@ -81,18 +140,25 @@ export function triggerChatNotification(title, text) {
   } catch { /* ignore */ }
 }
 
-export async function sendDirectMessage({ senderEmail, senderName, receiverEmail, text, fileAttachment }) {
+export async function sendDirectMessage({ senderEmail, senderName, receiverEmail, text, fileAttachment, ticketId }) {
+  const sEmail = (senderEmail || 'admin@ticketflow.ai').trim().toLowerCase()
+  const isAgentSender = sEmail.includes('agent') || sEmail.includes('admin') || sEmail.includes('@ticketflow.ai') || sEmail === 'vedprakash@gmail.com' || sEmail === 'amar@gmail.com' || sEmail === 'deepak@gmail.com' || sEmail === 'siddharth@gmail.com'
+  const role = isAgentSender ? 'AGENT' : 'CUSTOMER'
+
   const msgObj = {
     id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    sender_email: (senderEmail || 'admin@ticketflow.ai').trim().toLowerCase(),
-    sender_name: senderName || 'Administrator',
+    ticket_id: ticketId || null,
+    sender_email: sEmail,
+    sender_name: senderName || (isAgentSender ? 'Support Agent' : 'Customer'),
     receiver_email: (receiverEmail || '').trim().toLowerCase(),
+    author_role: role,
     text: (text || '').trim(),
+    content: (text || '').trim(),
     file_attachment: fileAttachment || null,
     created_at: new Date().toISOString()
   }
 
-  // Save in isolated pair local cache
+  // 1. Save in isolated pair local cache
   try {
     const pairKey = [msgObj.sender_email, msgObj.receiver_email].sort().join('__')
     const localKey = `tf_pair_chat_${pairKey}`
@@ -101,14 +167,42 @@ export async function sendDirectMessage({ senderEmail, senderName, receiverEmail
     localStorage.setItem(localKey, JSON.stringify([...list, msgObj]))
   } catch { /* ignore */ }
 
-  // Try Supabase insert
+  // 2. Persist to Supabase tickets.activities array so ALL devices receive it live
   try {
-    await supabase.from('agent_messages').insert([msgObj])
+    let targetTicketId = ticketId
+    if (!targetTicketId) {
+      // Find ticket matching sender/receiver email
+      const { data: found } = await supabase.from('tickets').select('id, activities').or(`customer_email.ilike.${msgObj.sender_email},customer_email.ilike.${msgObj.receiver_email}`).limit(1)
+      if (Array.isArray(found) && found.length > 0) {
+        targetTicketId = found[0].id
+      }
+    }
+
+    if (targetTicketId) {
+      const { data: t } = await supabase.from('tickets').select('activities').eq('id', targetTicketId).single()
+      if (t) {
+        const updatedActivities = [...(t.activities || []), msgObj]
+        await supabase.from('tickets').update({ activities: updatedActivities }).eq('id', targetTicketId)
+      }
+    }
   } catch { /* fallback */ }
 
-  // Trigger Notification for the recipient
+  // 3. Also insert into ticket_activities table in Supabase
+  try {
+    await supabase.from('ticket_activities').insert([{
+      id: msgObj.id,
+      ticket_id: ticketId || 'global',
+      type: 'message',
+      author: msgObj.sender_name,
+      author_role: 'CHAT',
+      content: JSON.stringify(msgObj),
+      created_at: msgObj.created_at
+    }])
+  } catch { /* fallback */ }
+
+  // Trigger Notification ONLY for the recipient (NOT for sender)
   const notifText = fileAttachment ? `📎 Attached file: ${fileAttachment.name}` : text
-  triggerChatNotification(`💬 New Message from ${senderName || 'TicketFlow AI'}`, notifText)
+  triggerChatNotification(`💬 New Message from ${senderName || 'TicketFlow AI'}`, notifText, msgObj.receiver_email)
 
   return msgObj
 }

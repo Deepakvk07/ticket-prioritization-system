@@ -49,20 +49,50 @@ export default function TicketDetail({ user }) {
     reader.readAsDataURL(file)
   }
 
-  const customerEmail = (user?.email || ticket?.customer_email || 'customer@gmail.com').toLowerCase()
-  const customerName = user?.user_metadata?.full_name || ticket?.customer_name || 'Customer'
-  const agentTargetEmail = (ticket?.assigned_agent_email || 'support@ticketflow.ai').toLowerCase()
+  const demoUser = (() => {
+    try { return JSON.parse(localStorage.getItem('demo_user') || '{}') } catch { return {} }
+  })()
+  const currentUserEmail = (user?.email || demoUser.email || localStorage.getItem('user_email') || '').toLowerCase()
+  const isAgentEmail = currentUserEmail.includes('agent') || currentUserEmail.includes('admin') || ['vedprakash@gmail.com', 'amar@gmail.com', 'deepak@gmail.com', 'siddharth@gmail.com'].includes(currentUserEmail)
+  const isStaff = (demoUser.role === 'admin' || demoUser.role === 'agent' || isAgentEmail) && (currentUserEmail ? isAgentEmail : (demoUser.role === 'admin' || demoUser.role === 'agent'))
+  const currentUserName = user?.user_metadata?.full_name || user?.name || demoUser.name || 'User'
 
-  // Poll for real incoming agent messages every 2 seconds
+  const ticketCustomerEmail = (ticket?.customer_email || 'customer@gmail.com').toLowerCase()
+  const ticketCustomerName = ticket?.customer_name || 'Customer'
+  const ticketAgentEmail = (ticket?.assigned_agent_email || 'support@ticketflow.ai').toLowerCase()
+
+  // Strict pair definition:
+  // If logged-in user is Customer: chat between currentUserEmail and ticketAgentEmail
+  // If logged-in user is Staff (Agent/Admin): chat between currentUserEmail and ticketCustomerEmail
+  const chatMyEmail = currentUserEmail || (isStaff ? ticketAgentEmail : ticketCustomerEmail)
+  const chatOtherEmail = isStaff ? ticketCustomerEmail : ticketAgentEmail
+
+  // Dedicated sender identity for sending messages
+  const mySenderEmail = isStaff
+    ? (currentUserEmail || ticketAgentEmail)
+    : (ticketCustomerEmail || currentUserEmail || 'customer@gmail.com')
+
+  const mySenderName = isStaff
+    ? (user?.user_metadata?.full_name || user?.name || (demoUser?.role === 'agent' || demoUser?.role === 'admin' ? demoUser?.name : null) || ticket?.assigned_agent || 'Support Agent')
+    : (ticketCustomerName || user?.user_metadata?.full_name || 'Customer')
+
+  const myReceiverEmail = isStaff ? ticketCustomerEmail : ticketAgentEmail
+
+  // Poll for real incoming agent/customer messages every 2 seconds
   useEffect(() => {
-    if (!id || !agentTargetEmail) return
+    if (!id || !chatMyEmail || !chatOtherEmail) return
     let isMounted = true
 
     const loadLiveMessages = async () => {
       try {
-        const msgs = await getDirectMessages(customerEmail, agentTargetEmail)
+        const msgs = await getDirectMessages(chatMyEmail, chatOtherEmail, id)
         if (isMounted) {
-          setDirectChatMsgs(msgs)
+          setDirectChatMsgs(prev => {
+            const prevIds = prev.map(m => m.id).join(',')
+            const newIds = msgs.map(m => m.id).join(',')
+            if (prevIds !== newIds) return msgs
+            return prev
+          })
         }
       } catch { /* ignore */ }
     }
@@ -74,11 +104,15 @@ export default function TicketDetail({ user }) {
       isMounted = false
       clearInterval(interval)
     }
-  }, [id, customerEmail, agentTargetEmail])
+  }, [id, chatMyEmail, chatOtherEmail])
+
+  const chatContainerRef = useRef(null)
 
   useEffect(() => {
-    directChatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [directChatMsgs])
+    if (chatContainerRef.current && directChatMsgs.length > 0) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    }
+  }, [directChatMsgs.length])
 
   const handleSendDirectChat = async (e) => {
     if (e) e.preventDefault()
@@ -92,11 +126,12 @@ export default function TicketDetail({ user }) {
 
     try {
       const sentMsg = await sendDirectMessage({
-        senderEmail: customerEmail,
-        senderName: customerName,
-        receiverEmail: agentTargetEmail,
+        senderEmail: mySenderEmail,
+        senderName: mySenderName,
+        receiverEmail: myReceiverEmail,
         text: textToSend,
-        fileAttachment: fileToSend
+        fileAttachment: fileToSend,
+        ticketId: id
       })
 
       setDirectChatMsgs(prev => [...prev, sentMsg])
@@ -113,12 +148,11 @@ export default function TicketDetail({ user }) {
     setDirectChatSending(true)
     try {
       await handleStatusChange('Resolved')
-      const agentNameStr = user?.user_metadata?.full_name || user?.name || user?.email || 'Support Agent'
       const solveMsg = await sendDirectMessage({
-        senderEmail: isStaff ? (user?.email || 'agent@ticketflow.ai') : customerEmail,
-        senderName: agentNameStr,
-        receiverEmail: isStaff ? customerEmail : agentTargetEmail,
-        text: `✅ Ticket #${id?.slice(0, 8)?.toUpperCase() || ''} has been marked as SOLVED & RESOLVED by ${agentNameStr}.`
+        senderEmail: chatMyEmail,
+        senderName: currentUserName,
+        receiverEmail: chatOtherEmail,
+        text: `✅ Ticket #${id?.slice(0, 8)?.toUpperCase() || ''} has been marked as SOLVED & RESOLVED by ${currentUserName}.`
       })
       setDirectChatMsgs(prev => [...prev, solveMsg])
       setTicket(t => ({ ...t, status: 'Resolved' }))
@@ -207,17 +241,9 @@ export default function TicketDetail({ user }) {
     }
   }, [id])
 
-  let demoUser = null
-  try {
-    const raw = localStorage.getItem('demo_user')
-    if (raw && raw !== 'undefined' && raw !== 'null') demoUser = JSON.parse(raw)
-  } catch {}
-
-  const storedRole = localStorage.getItem('user_role_mode') || 'admin'
-  const isStaff = storedRole === 'admin' || storedRole === 'agent'
   const currentRole = isStaff ? 'AGENT' : 'CUSTOMER'
   const currentAuthorName = isStaff
-    ? (demoUser?.name || (user?.user_metadata?.full_name !== 'Google User' ? user?.user_metadata?.full_name : null) || user?.name || (storedRole === 'agent' ? 'Support Agent' : 'Admin System'))
+    ? (demoUser?.name || (user?.user_metadata?.full_name !== 'Google User' ? user?.user_metadata?.full_name : null) || user?.name || (activeRole === 'agent' ? 'Support Agent' : 'Admin System'))
     : (user?.user_metadata?.full_name || demoUser?.name || user?.email || 'Customer')
 
   const handleSend = async () => {
@@ -661,19 +687,42 @@ export default function TicketDetail({ user }) {
           {/* Activity Messages Timeline Container */}
           <div style={{ marginBottom: 24 }}>
 
-            {/* Agent Resolution Controls & Canned Templates — Only for Staff/Agents */}
-            {isStaff ? (
-              <div className="card" style={{ padding: 20, marginTop: 20, background: 'var(--bg-surface)', border: '1px solid var(--border-active)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <CheckCircle2 size={16} color="#10b981" /> Agent Resolution & Response Workspace
+          {/* Direct Real-Time Live Chat Box (Unified for both Customer & Agent) */}
+          <div className="card" style={{ padding: 0, marginTop: 24, borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)' }}>
+            {/* Embedded Chat Header */}
+            <div style={{
+              padding: '14px 20px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+              color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%', background: '#2563eb',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: '0.85rem', color: '#fff'
+                }}>
+                  {(isStaff ? ticketCustomerName : (t.assigned_agent || 'AG')).slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    💬 Direct Live Chat {isStaff ? `with Customer (${ticketCustomerName})` : `with Agent (${t.assigned_agent || 'Support Specialist'})`}
+                    <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: 10, background: 'rgba(16,185,129,0.2)', color: '#34d399', fontWeight: 700 }}>
+                      🟢 Active 2-Way Channel
+                    </span>
                   </div>
+                  <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                    {t.assigned_department || 'Technical Support'} &bull; Real-time direct stream
+                  </div>
+                </div>
+              </div>
 
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Status:</span>
+              {/* Status Controls & Solved Button for Staff/Agents */}
+              {isStaff && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.76rem', color: '#94a3b8' }}>Status:</span>
                     <select
                       className="form-select"
-                      style={{ padding: '4px 10px', fontSize: '0.8rem', borderRadius: 8, height: 32 }}
+                      style={{ padding: '3px 8px', fontSize: '0.78rem', borderRadius: 8, height: 30, background: '#1e293b', color: '#fff', border: '1px solid #334155' }}
                       value={t.status || 'Open'}
                       onChange={e => handleStatusChange(e.target.value)}
                     >
@@ -684,163 +733,67 @@ export default function TicketDetail({ user }) {
                       <option value="Closed">Closed</option>
                     </select>
                   </div>
-                </div>
 
-                {/* Quick Canned Response Buttons */}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>Quick Templates:</span>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    style={{ fontSize: '0.75rem', padding: '4px 12px', background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(168,85,247,0.25))', color: '#c084fc', border: '1px solid rgba(168,85,247,0.4)', fontWeight: 800 }}
-                    onClick={() => {
-                      const cat = t.category || 'Technical Support'
-                      const subj = t.subject || 'issue'
-                      const name = t.customer_name || 'Customer'
-                      const draft = `Hello ${name},\n\nThank you for bringing "${subj}" to our attention. Our ${cat} engineering team has analyzed the root cause and applied an immediate fix to your environment.\n\nPlease verify on your end and let us know if you require any further assistance.\n\nBest regards,\nTicketFlow AI Support Team`
-                      setReply(draft)
-                    }}
-                  >
-                    ✨ AI Smart Auto-Reply (1-Click Draft)
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    style={{ fontSize: '0.75rem', padding: '3px 10px', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.2)' }}
-                    onClick={() => setReply("I've investigated the issue and deployed a hotfix to production. Everything is operational. Please confirm on your end.")}
-                  >
-                    ⚡ Issue Fixed & Deployed
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    style={{ fontSize: '0.75rem', padding: '3px 10px', background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}
-                    onClick={() => setReply("We've verified your CIDR range and whitelisted your API credentials in our VPC. Please test again.")}
-                  >
-                    ⚡ Credentials Whitelisted
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    style={{ fontSize: '0.75rem', padding: '3px 10px', background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}
-                    onClick={() => setReply("We require additional diagnostics. Could you please export and attach your browser/terminal network logs?")}
-                  >
-                    ⚡ Request Customer Logs
-                  </button>
-                </div>
-
-                <textarea
-                  className="form-textarea"
-                  style={{ minHeight: 95, marginBottom: 10, fontSize: '0.92rem' }}
-                  placeholder="Write resolution details or reply message..."
-                  value={reply}
-                  onChange={e => setReply(e.target.value)}
-                />
-
-                {/* Reply file chips */}
-                {replyFiles.length > 0 && (
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-                    {replyFiles.map((f, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 8, padding: '4px 10px', fontSize: '0.78rem', color: '#93c5fd' }}>
-                        <Paperclip size={12} />
-                        {f.name}
-                        <button onClick={() => setReplyFiles(prev => prev.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 0, display: 'flex' }}>
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input type="file" multiple ref={replyFileRef} style={{ display: 'none' }} onChange={e => handleReplyFileAdd(e.target.files)} />
-                    <button className="btn btn-ghost btn-sm" onClick={() => replyFileRef.current?.click()} style={{ padding: '7px 14px', gap: 6 }}>
-                      {uploadingFiles ? <Loader size={13} style={{ animation: 'spin 0.7s linear infinite' }} /> : <Paperclip size={13} />}
-                      Attach File
-                    </button>
-                  </div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#ffffff', border: 'none', fontWeight: 700, padding: '10px 20px', boxShadow: '0 4px 14px rgba(16,185,129,0.3)' }}
-                      disabled={sending}
-                      onClick={async () => {
-                        setSending(true)
-                        try {
-                          await handleStatusChange('Resolved')
-                          const msgText = reply.trim() || 'Ticket status marked as Resolved by Support Agent.'
-                          await addActivity(id, {
-                            ticket_id: id,
-                            type: 'message',
-                            author: user?.user_metadata?.full_name || user?.name || user?.email || 'Support Agent',
-                            author_role: 'AGENT',
-                            content: msgText,
-                          })
-                          setReply('')
-                          const updated = await getTicket(id).catch(() => null)
-                          if (updated) setTicket(updated)
-                          else setTicket(t => ({ ...t, status: 'Resolved' }))
-                        } catch {
-                          setTicket(t => ({ ...t, status: 'Resolved' }))
-                        } finally {
-                          setSending(false)
-                        }
-                      }}
-                    >
-                      {sending ? 'Resolving…' : '✓ Mark as Resolved'}
-                    </button>
-
-                    <button className="btn btn-primary" disabled={(!reply.trim() && replyFiles.length === 0) || sending} onClick={handleSend} style={{ padding: '10px 24px', fontWeight: 700 }}>
-                      <Send size={15} /> {sending ? 'Sending…' : 'Send Reply'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="card" style={{ padding: 0, marginTop: 24, borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)' }}>
-                {/* Embedded Chat Header */}
-                <div style={{
-                  padding: '14px 20px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                  color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{
-                      width: 36, height: 36, borderRadius: '50%', background: '#2563eb',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: 800, fontSize: '0.85rem', color: '#fff'
-                    }}>
-                      {(t.assigned_agent || 'AG').slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        💬 Direct Live Chat with Agent ({t.assigned_agent || 'Support Specialist'})
-                        <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: 10, background: 'rgba(16,185,129,0.2)', color: '#34d399', fontWeight: 700 }}>
-                          🟢 Active
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-                        {t.assigned_department || 'Technical Support'} &bull; Real-time 2-way channel
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Solved / Resolved Action Button for Agents */}
-                  {isStaff && t.status !== 'Resolved' && t.status !== 'Closed' && (
+                  {t.status !== 'Resolved' && t.status !== 'Closed' && (
                     <button
                       type="button"
                       className="btn btn-sm"
-                      style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#ffffff', border: 'none', fontWeight: 700, padding: '6px 14px', borderRadius: 8, fontSize: '0.8rem' }}
+                      style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#ffffff', border: 'none', fontWeight: 700, padding: '5px 14px', borderRadius: 8, fontSize: '0.78rem' }}
                       onClick={handleMarkSolvedInChat}
                     >
-                      ✓ Mark Ticket Solved
+                      ✓ Mark Solved
                     </button>
                   )}
                 </div>
+              )}
+            </div>
+
+            {/* Quick Templates Bar for Agents */}
+            {isStaff && (
+              <div style={{ padding: '10px 16px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-muted)' }}>⚡ Quick Auto-Reply Templates:</span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  style={{ fontSize: '0.74rem', padding: '3px 10px', background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)', fontWeight: 700 }}
+                  onClick={() => {
+                    const cat = t.category || 'Technical Support'
+                    const subj = t.subject || 'issue'
+                    const name = ticketCustomerName || 'Customer'
+                    setDirectChatInput(`Hello ${name}, our ${cat} engineering team has analyzed "${subj}" and applied an immediate fix to your environment. Please verify on your end!`)
+                  }}
+                >
+                  ✨ AI Auto-Reply
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  style={{ fontSize: '0.74rem', padding: '3px 10px', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.2)' }}
+                  onClick={() => setDirectChatInput("I've investigated your issue and deployed a hotfix to production. Everything is operational!")}
+                >
+                  ⚡ Issue Fixed & Deployed
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  style={{ fontSize: '0.74rem', padding: '3px 10px', background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}
+                  onClick={() => setDirectChatInput("We've verified your CIDR range and whitelisted your API credentials. Please test again!")}
+                >
+                  ⚡ Credentials Whitelisted
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  style={{ fontSize: '0.74rem', padding: '3px 10px', background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}
+                  onClick={() => setDirectChatInput("Could you please export and attach your browser/terminal network logs so we can analyze further?")}
+                >
+                  ⚡ Request Customer Logs
+                </button>
+              </div>
+            )}
 
                 {/* Embedded Chat Messages Body */}
-                <div style={{
+                <div ref={chatContainerRef} style={{
                   maxHeight: 360, minHeight: 200, padding: 20, overflowY: 'auto', background: 'var(--bg-card-hover)',
                   display: 'flex', flexDirection: 'column', gap: 12
                 }}>
@@ -862,8 +815,33 @@ export default function TicketDetail({ user }) {
                     </div>
                   ) : (
                     directChatMsgs.map(msg => {
-                      const isMe = msg.sender_email?.toLowerCase() === customerEmail.toLowerCase()
-                      const senderLabel = isMe ? 'You' : (msg.sender_name || t.assigned_agent || 'Support Agent')
+                      const msgSender = (msg.sender_email || '').trim().toLowerCase()
+                      const role = (msg.author_role || '').toUpperCase()
+
+                      const isThisMsgFromAgent = role === 'AGENT' ||
+                        msgSender === ticketAgentEmail.toLowerCase() ||
+                        msgSender.includes('agent') ||
+                        msgSender.includes('admin') ||
+                        msgSender.includes('@ticketflow.ai') ||
+                        msgSender === 'vedprakash@gmail.com' ||
+                        msgSender === 'amar@gmail.com' ||
+                        msgSender === 'siddharth@gmail.com'
+
+                      const myEmail = (mySenderEmail || '').trim().toLowerCase()
+
+                      let isMe = false
+                      if (msgSender && myEmail && msgSender === myEmail) {
+                        isMe = true
+                      } else if (role) {
+                        isMe = isStaff ? (role === 'AGENT') : (role === 'CUSTOMER')
+                      } else {
+                        isMe = isStaff ? isThisMsgFromAgent : !isThisMsgFromAgent
+                      }
+
+                      const senderLabel = isMe
+                        ? 'You'
+                        : (isThisMsgFromAgent ? (t.assigned_agent || 'Support Agent') : (ticketCustomerName || 'Customer'))
+
                       const timeStr = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
 
                       return (
@@ -980,7 +958,6 @@ export default function TicketDetail({ user }) {
                   </button>
                 </form>
               </div>
-            )}
 
             {/* Rating Card — show after resolved/closed ONLY to Customers (not Agents/Admins) */}
             {!isStaff && (t.status === 'Resolved' || t.status === 'Closed') && (

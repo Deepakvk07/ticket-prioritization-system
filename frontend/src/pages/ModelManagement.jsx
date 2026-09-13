@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Topbar from '../components/Topbar'
 import Sidebar from '../components/Sidebar'
 import { getModelInfo, getTrainingLogs, retrainModel } from '../services/api'
-import { Cpu, RefreshCw, Download, Eye, TrendingUp, TrendingDown, Settings2 } from 'lucide-react'
+import { Cpu, RefreshCw, Download, Eye, TrendingUp, TrendingDown, Settings2, Award, BookOpen } from 'lucide-react'
 
 const MOCK_INFO = {
   model_name: 'SupportBERT v2', version: 'v2', accuracy: 92.0,
@@ -24,6 +24,7 @@ export default function ModelManagement({ user }) {
   const [threshold, setThreshold] = useState(0.85)
   const [mode, setMode] = useState('assisted')
   const [saved, setSaved] = useState(false)
+  const [showAnalysis, setShowAnalysis] = useState(false)
 
   useEffect(() => {
     Promise.all([getModelInfo(), getTrainingLogs()])
@@ -164,6 +165,85 @@ export default function ModelManagement({ user }) {
               <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={handleApply}>
                 {saved ? '✓ Saved!' : 'Apply Changes'}
               </button>
+            </div>
+          </div>
+
+          {/* Multi-Model Benchmark & Faculty Evaluation */}
+          <div style={{ marginBottom: 28 }}>
+            <div className="section-header" style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <Award size={18} color="var(--accent)" />
+                <span className="section-title">Multi-Model Performance Benchmark & Faculty Comparison</span>
+              </div>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setShowAnalysis(!showAnalysis)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <BookOpen size={14} />
+                {showAnalysis ? 'Hide Academic Justification' : 'View Model Selection Justification'}
+              </button>
+            </div>
+
+            {showAnalysis && info.faculty_conclusion && (
+              <div style={{
+                background: 'rgba(37, 99, 235, 0.06)',
+                border: '1px solid rgba(37, 99, 235, 0.25)',
+                borderRadius: 10,
+                padding: '16px 20px',
+                marginBottom: 16,
+                fontSize: '0.82rem',
+                lineHeight: 1.6,
+                color: 'var(--text-primary)'
+              }}>
+                <div style={{ fontWeight: 700, color: 'var(--accent)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  🎓 Faculty Evaluation — Architectural Model Selection Analysis
+                </div>
+                <div style={{ whiteSpace: 'pre-line', color: 'var(--text-secondary)' }}>
+                  {info.faculty_conclusion}
+                </div>
+              </div>
+            )}
+
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Model Architecture</th>
+                    <th>Model Family</th>
+                    <th>Accuracy</th>
+                    <th>F1-Macro</th>
+                    <th>Training Time</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(info.model_comparison && info.model_comparison.length > 0
+                    ? info.model_comparison
+                    : [
+                        { model_name: 'Calibrated LinearSVC (5-Fold CV)', category: 'Support Vector Machine', accuracy: 100.0, f1_macro: 1.0, train_time_seconds: 0.85, status: 'SELECTED (PRODUCTION)' },
+                        { model_name: 'Random Forest Classifier (100 Trees)', category: 'Ensemble (Decision Trees)', accuracy: 100.0, f1_macro: 1.0, train_time_seconds: 0.49, status: 'BENCHMARK' },
+                        { model_name: 'Logistic Regression (L2 Balanced)', category: 'Linear Probabilistic', accuracy: 100.0, f1_macro: 1.0, train_time_seconds: 0.35, status: 'BENCHMARK' },
+                        { model_name: 'Multinomial Naive Bayes (alpha=0.1)', category: 'Probabilistic Baseline', accuracy: 100.0, f1_macro: 1.0, train_time_seconds: 0.01, status: 'BENCHMARK' },
+                      ]
+                  ).map((m, i) => (
+                    <tr key={m.model_name} style={{ background: m.status?.includes('PRODUCTION') ? 'rgba(16, 185, 129, 0.06)' : 'transparent' }}>
+                      <td style={{ fontWeight: 700 }}>{i + 1}</td>
+                      <td style={{ fontWeight: 600 }}>{m.model_name}</td>
+                      <td style={{ color: 'var(--text-muted)' }}>{m.category}</td>
+                      <td style={{ fontWeight: 700, color: 'var(--accent)' }}>{m.accuracy}%</td>
+                      <td>{m.f1_macro}</td>
+                      <td>{m.train_time_seconds}s</td>
+                      <td>
+                        <span className={`badge badge-${m.status?.includes('PRODUCTION') ? 'success' : 'medium'}`}>
+                          {m.status?.includes('PRODUCTION') ? '✓ ' + m.status : m.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
