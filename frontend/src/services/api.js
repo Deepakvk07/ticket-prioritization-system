@@ -117,6 +117,12 @@ function generateUUID() {
 
 export const getTickets = async (params = {}) => {
   let supabaseTickets = []
+  const storedRole = localStorage.getItem('user_role_mode') || (() => {
+    try { return JSON.parse(localStorage.getItem('demo_user') || '{}')?.role } catch { return null }
+  })()
+  const isExplicitCustomer = storedRole === 'customer'
+  const filterEmail = (params.customer_email || (isExplicitCustomer ? localStorage.getItem('user_email') : null) || '').toLowerCase().trim()
+
   try {
     let query = supabase
       .from('tickets')
@@ -124,8 +130,8 @@ export const getTickets = async (params = {}) => {
       .order('created_at', { ascending: false })
       .limit(params.limit || 100)
 
-    if (params.customer_email) {
-      query = query.ilike('customer_email', params.customer_email.trim())
+    if (filterEmail) {
+      query = query.ilike('customer_email', filterEmail)
     }
     if (params.assigned_agent) {
       query = query.ilike('assigned_agent', `%${params.assigned_agent.trim()}%`)
@@ -144,7 +150,7 @@ export const getTickets = async (params = {}) => {
         const code = t.ticket_code || t.code || `TK-${(t.id || '').substring(0, 5).toUpperCase()}`
         return { ...t, code, ticket_code: code }
       })
-      if (data.length === 0 && !params.customer_email && !params.status) {
+      if (data.length === 0 && !filterEmail && !params.status) {
         try { localStorage.removeItem(LOCAL_TICKETS_KEY) } catch {}
       }
     }
@@ -152,9 +158,8 @@ export const getTickets = async (params = {}) => {
 
   // Merge Supabase tickets with local tickets
   let local = getLocalTickets()
-  if (params.customer_email) {
-    const cEmail = params.customer_email.toLowerCase().trim()
-    local = local.filter(t => (t.customer_email || '').toLowerCase().trim() === cEmail)
+  if (filterEmail) {
+    local = local.filter(t => (t.customer_email || '').toLowerCase().trim() === filterEmail)
   }
   if (params.status) {
     local = local.filter(t => t.status === params.status)
@@ -171,7 +176,10 @@ export const getTickets = async (params = {}) => {
     }
   })
 
-  const merged = Array.from(mergedMap.values())
+  let merged = Array.from(mergedMap.values())
+  if (filterEmail) {
+    merged = merged.filter(t => (t.customer_email || '').toLowerCase().trim() === filterEmail)
+  }
   if (merged.length > 0) return merged
 
   // Try Backend API fallback

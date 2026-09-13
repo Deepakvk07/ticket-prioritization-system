@@ -28,10 +28,10 @@ export default function TicketQueue({ user }) {
   const demoUser = (() => {
     try { return JSON.parse(localStorage.getItem('demo_user') || '{}') } catch { return {} }
   })()
-  const activeRole = demoUser.role || localStorage.getItem('user_role_mode') || 'customer'
+  const activeRole = demoUser.role || user?.role || localStorage.getItem('user_role_mode') || 'customer'
   const isAgent = activeRole === 'agent'
   const isAdmin = activeRole === 'admin'
-  const isCustomer = activeRole === 'customer'
+  const isCustomer = activeRole === 'customer' || (!isAgent && !isAdmin)
   const agentDepartment = demoUser.department || ''
 
   const agentEmail = (demoUser.email || user?.email || 'agent@ticketflow.ai').toLowerCase()
@@ -186,23 +186,28 @@ export default function TicketQueue({ user }) {
       .then(agents => setRegisteredAgents(agents))
       .catch(() => setRegisteredAgents([]))
 
-    getTickets()
-      .then(res => setTickets(Array.isArray(res) ? res : []))
-      .catch(() => setTickets([]))
-      .finally(() => setLoading(false))
+    const fetchTickets = () => {
+      const params = isCustomer && currentUserEmail ? { customer_email: currentUserEmail } : {}
+      getTickets(params)
+        .then(res => setTickets(Array.isArray(res) ? res : []))
+        .catch(() => setTickets([]))
+        .finally(() => setLoading(false))
+    }
+
+    fetchTickets()
 
     // Supabase Realtime channel listener for live sync across all portals
     const channel = supabase
       .channel('public:tickets')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
-        getTickets().then(res => setTickets(Array.isArray(res) ? res : []))
+        fetchTickets()
       })
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [currentUserEmail, isCustomer])
 
   const handleAssignAgent = async (ticketId, agentObj) => {
     try {

@@ -32,18 +32,20 @@ export default function TicketHistory({ user }) {
     try { return JSON.parse(localStorage.getItem('demo_user') || '{}') } catch { return {} }
   })()
   const agentDepartment = demoUser.department || ''
-  const activeRole = demoUser.role || localStorage.getItem('user_role_mode') || 'customer'
+  const activeRole = demoUser.role || user?.role || localStorage.getItem('user_role_mode') || 'customer'
   const isAgent = activeRole === 'agent'
-  const isCustomer = activeRole === 'customer'
+  const isAdmin = activeRole === 'admin'
+  const isCustomer = activeRole === 'customer' || (!isAgent && !isAdmin)
   const currentUserEmail = (user?.email || demoUser.email || localStorage.getItem('user_email') || '').toLowerCase().trim()
   const currentUserName = (user?.user_metadata?.full_name || user?.name || demoUser.name || '').toLowerCase().trim()
 
   useEffect(() => {
-    getTickets()
+    const params = isCustomer && currentUserEmail ? { customer_email: currentUserEmail } : {}
+    getTickets(params)
       .then(res => setTickets(Array.isArray(res) ? res : []))
       .catch(() => setTickets([]))
       .finally(() => setLoading(false))
-  }, [])
+  }, [currentUserEmail, isCustomer])
 
   // Filter for resolved/closed tickets only (history = completed work)
   const historyTickets = tickets.filter(t => {

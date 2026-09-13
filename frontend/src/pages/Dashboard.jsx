@@ -49,20 +49,21 @@ export default function Dashboard({ user }) {
   const [assignmentSuccess, setAssignmentSuccess] = useState('')
 
   const demoUser = localStorage.getItem('demo_user') ? JSON.parse(localStorage.getItem('demo_user')) : null
-  const activeRole = demoUser?.role || localStorage.getItem('user_role_mode') || 'customer'
+  const activeRole = demoUser?.role || user?.role || localStorage.getItem('user_role_mode') || 'customer'
   const isAdmin = activeRole === 'admin'
   const isAgent = activeRole === 'agent'
-  const isCustomer = activeRole === 'customer'
+  const isCustomer = activeRole === 'customer' || (!isAgent && !isAdmin)
   const currentUserEmail = (user?.email || demoUser?.email || localStorage.getItem('user_email') || '').toLowerCase().trim()
   const currentUserName = (user?.user_metadata?.full_name || user?.name || demoUser?.name || '').toLowerCase().trim()
 
   useEffect(() => {
     getAgents().then(setRegisteredAgents).catch(() => setRegisteredAgents([]))
-    getTickets()
+    const params = isCustomer && currentUserEmail ? { customer_email: currentUserEmail } : {}
+    getTickets(params)
       .then(res => setTickets(Array.isArray(res) ? res : []))
       .catch(() => setTickets([]))
       .finally(() => setLoading(false))
-  }, [])
+  }, [currentUserEmail, isCustomer])
 
   const userTickets = tickets.filter(t => {
     if (isCustomer) {
