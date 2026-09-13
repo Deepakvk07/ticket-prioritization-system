@@ -150,13 +150,27 @@ export const getTickets = async (params = {}) => {
         const code = t.ticket_code || t.code || `TK-${(t.id || '').substring(0, 5).toUpperCase()}`
         return { ...t, code, ticket_code: code }
       })
-      if (data.length === 0 && !filterEmail && !params.status) {
-        try { localStorage.removeItem(LOCAL_TICKETS_KEY) } catch {}
-      }
-    }
-  } catch { /* fallback */ }
 
-  // Merge Supabase tickets with local tickets
+      // Keep local storage cache strictly in sync with Supabase
+      try {
+        if (data.length === 0) {
+          if (!filterEmail) {
+            localStorage.removeItem(LOCAL_TICKETS_KEY)
+          } else {
+            const remaining = getLocalTickets().filter(t => (t.customer_email || '').toLowerCase().trim() !== filterEmail)
+            saveLocalTickets(remaining)
+          }
+        } else {
+          saveLocalTickets(supabaseTickets)
+        }
+      } catch {}
+
+      // Supabase is the single source of truth when online
+      return supabaseTickets
+    }
+  } catch { /* fallback to local storage ONLY if Supabase is offline / network error */ }
+
+  // Fallback to local tickets ONLY if Supabase is unreachable
   let local = getLocalTickets()
   if (filterEmail) {
     local = local.filter(t => (t.customer_email || '').toLowerCase().trim() === filterEmail)
@@ -164,31 +178,8 @@ export const getTickets = async (params = {}) => {
   if (params.status) {
     local = local.filter(t => t.status === params.status)
   }
-  const mergedMap = new Map()
 
-  supabaseTickets.forEach(t => {
-    mergedMap.set(t.id, t)
-  })
-
-  local.forEach(t => {
-    if (!mergedMap.has(t.id) && !mergedMap.has(t.code)) {
-      mergedMap.set(t.id, t)
-    }
-  })
-
-  let merged = Array.from(mergedMap.values())
-  if (filterEmail) {
-    merged = merged.filter(t => (t.customer_email || '').toLowerCase().trim() === filterEmail)
-  }
-  if (merged.length > 0) return merged
-
-  // Try Backend API fallback
-  try {
-    const r = await api.get('/api/tickets/', { params })
-    if (Array.isArray(r.data)) return r.data
-  } catch { /* fallback */ }
-
-  return []
+  return local
 }
 
 export const getTicket = async (id) => {

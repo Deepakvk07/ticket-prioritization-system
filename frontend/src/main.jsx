@@ -3,6 +3,33 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 
+// Automatic Database Wipe & Stale Cache Purge:
+// When database entities are wiped, purge all stale browser localStorage entries
+const DB_VERSION_KEY = 'tf_db_version'
+const CURRENT_DB_VERSION = 'wipe_2026_09_13_v2'
+
+try {
+  if (localStorage.getItem(DB_VERSION_KEY) !== CURRENT_DB_VERSION) {
+    localStorage.removeItem('tf_local_tickets')
+    localStorage.removeItem('demo_user')
+    localStorage.removeItem('user_email')
+    localStorage.removeItem('user_role_mode')
+    localStorage.removeItem('tf_notifications')
+    localStorage.removeItem('user_profile')
+    Object.keys(localStorage).forEach(k => {
+      if (
+        k.startsWith('tf_pair_chat_') ||
+        k.startsWith('tf_ticket_chat_') ||
+        k.startsWith('tf_viewing_') ||
+        k.startsWith('sb-')
+      ) {
+        localStorage.removeItem(k)
+      }
+    })
+    localStorage.setItem(DB_VERSION_KEY, CURRENT_DB_VERSION)
+  }
+} catch {}
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
