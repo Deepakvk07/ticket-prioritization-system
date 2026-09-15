@@ -1,6 +1,6 @@
 """
 ================================================================================
-FINAL YEAR CAPSTONE PROJECT: OmniSupport AI (TicketFlow AI)
+FINAL YEAR CAPSTONE PROJECT: TicketFlow AI
 Project Title: AI-Powered Customer Support Ticket Prioritization System
 Tech Stack   : Python (FastAPI), Machine Learning (Scikit-Learn), React, Supabase
 ================================================================================
@@ -16,7 +16,7 @@ from app.services.ml_service import predict_priority
 settings = get_settings()
 
 app = FastAPI(
-    title="OmniSupport AI — Ticket Prioritization System",
+    title="TicketFlow AI — Ticket Prioritization System",
     description="Student Project: AI Microservice for Automatic Helpdesk Ticket Prioritization",
     version="1.0.0",
 )
@@ -56,7 +56,7 @@ async def predict_priority_root(req: PredictRequest):
 @app.get("/", tags=["Health"])
 async def root():
     return {
-        "project": "OmniSupport AI Ticket Prioritization System",
+        "project": "TicketFlow AI Ticket Prioritization System",
         "status": "Running",
         "version": "1.0.0"
     }

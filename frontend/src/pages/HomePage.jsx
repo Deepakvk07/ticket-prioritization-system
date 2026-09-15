@@ -685,7 +685,7 @@ export default function HomePage({ user }) {
               textAlign: 'center', paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.06)',
               fontSize: '0.78rem', color: 'var(--text-muted)'
             }}>
-              © 2026 TicketFlow AI Technologies Inc. All Rights Reserved. ® | TicketFlow™, OmniSupport™, and AI Triage Engine™ are registered trademarks.
+              © 2026 TicketFlow AI Technologies Inc. All Rights Reserved. ® | TicketFlow™ and AI Triage Engine™ are registered trademarks.
             </div>
           </footer>
         </div>

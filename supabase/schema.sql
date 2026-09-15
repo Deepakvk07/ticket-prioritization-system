@@ -1,5 +1,5 @@
 -- ============================================================
--- OmniSupport AI — Supabase Schema
+-- TicketFlow AI — Supabase Schema
 -- Run this in Supabase SQL Editor (Project > SQL Editor)
 -- ============================================================
 
@@ -141,7 +141,7 @@ create policy "Admins can insert training logs"
 insert into public.tickets (subject, description, category, product_module, status, priority, ai_priority, confidence_score, customer_name, customer_email, created_at)
 values
   ('API Authentication Failure in Production',
-   'We are encountering a critical 403 Forbidden error whenever we attempt to sync our internal service mesh with the OmniSupport production endpoints. This started occurring after the 2.4.0 update last night.',
+   'We are encountering a critical 403 Forbidden error whenever we attempt to sync our internal service mesh with the TicketFlow AI production endpoints. This started occurring after the 2.4.0 update last night.',
    'Technical Support', 'Core Platform', 'Open', 'Critical', 'Critical', 94.0,
    'Sarah Jenkins', 'sarah@company.com', now() - interval '2 minutes'),
 

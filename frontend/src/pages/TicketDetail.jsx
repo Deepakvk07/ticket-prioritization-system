@@ -708,7 +708,7 @@ export default function TicketDetail({ user }) {
               <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Sparkles size={16} /> AI Executive Triage Summary
               </div>
-              <span className="badge badge-medium" style={{ fontSize: '0.72rem' }}>GPT-4 Omni Synthesized</span>
+              <span className="badge badge-medium" style={{ fontSize: '0.72rem' }}>TicketFlow AI Synthesized</span>
             </div>
             <div style={{ fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: 8, fontWeight: 600 }}>
               💡 <strong>Key Issue:</strong> {t.subject}. {t.description ? t.description.slice(0, 140) + '...' : ''}

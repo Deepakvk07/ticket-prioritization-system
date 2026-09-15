@@ -1,8 +1,7 @@
 """
 ================================================================================
-STUDENT CAPSTONE PROJECT — Standalone Model Testing CLI Tool
-Project Title: Ticket Prioritization System
-Usage        : python ml/predict.py "API Down" "All requests failing with 500"
+TicketFlow AI — Standalone Model Testing CLI Tool
+Usage: python ml/predict.py "API Down" "All requests failing with 500"
 ================================================================================
 """
 import sys

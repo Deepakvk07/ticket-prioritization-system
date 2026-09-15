@@ -1,4 +1,4 @@
-# OmniSupport AI 🤖
+# TicketFlow AI 🤖
 > **Enterprise AI-powered ticket prioritization system** — React + FastAPI + Supabase + ML
 
 ![Stack](https://img.shields.io/badge/Frontend-React%2018%20%2B%20Vite-61dafb?logo=react)

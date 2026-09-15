@@ -550,7 +550,7 @@ def train(df: pd.DataFrame):
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("  OmniSupport AI -- ML Training Pipeline (Multi-Model)")
+    print("  TicketFlow AI -- ML Training Pipeline (Multi-Model)")
     print("  Data source: customer_support_tickets.csv + enriched synthetic")
     print("=" * 60)
 

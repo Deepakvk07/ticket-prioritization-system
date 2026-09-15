@@ -2,7 +2,7 @@
 
 Write-Host ""
 Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host "  OmniSupport AI — Ticket Prioritization System  " -ForegroundColor Cyan
+Write-Host "  TicketFlow AI — Ticket Prioritization System  " -ForegroundColor Cyan
 Write-Host "  Student Capstone Project Startup Script        " -ForegroundColor Cyan
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host ""
